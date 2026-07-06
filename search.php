@@ -18,13 +18,13 @@ require "misc/header.php";
             <input type="text" name="q" placeholder="Search images" value="<?php echo $query_escaped; ?>" required maxlength="64">
             <button type="submit">Search</button>
         </div>
-        <span class="search-meta">Private image discovery</span>
+        <button class="secondary-button save-search-button" type="button" data-save-query="<?php echo $query_escaped; ?>">Save feed</button>
     </form>
 
     <main>
         <section class="results-heading" aria-labelledby="results-title">
             <h2 id="results-title">Ideas for “<?php echo $query_escaped; ?>”</h2>
-            <p>Scroll the masonry board, then open any pin through the image proxy.</p>
+            <p>Scroll the masonry board, preview any pin, then save favorites to private boards.</p>
         </section>
 
 <?php
@@ -106,8 +106,12 @@ $search = function ($query, $bookmark) use ($prepare_search_curl_obj) {
             $images[] = $url;
             $proxy_url = "/image_proxy.php?url=" . urlencode($url);
             $safe_proxy_url = htmlspecialchars($proxy_url, ENT_QUOTES, 'UTF-8');
-            echo "<a class='img-result' href='$safe_proxy_url' target='_blank' rel='noopener noreferrer'>";
-            echo "<img loading='lazy' decoding='async' src='$safe_proxy_url' alt='Pinterest result for " . htmlspecialchars($query, ENT_QUOTES, 'UTF-8') . "'></a>";
+            $safe_source_url = htmlspecialchars($url, ENT_QUOTES, 'UTF-8');
+            $safe_title = htmlspecialchars($query, ENT_QUOTES, 'UTF-8');
+            echo "<article class='img-result' data-image-url='$safe_source_url' data-proxy-url='$safe_proxy_url' data-pin-title='$safe_title'>";
+            echo "<a class='pin-open-link' href='$safe_proxy_url' rel='noopener noreferrer'>";
+            echo "<img loading='lazy' decoding='async' src='$safe_proxy_url' alt='Pinterest result for $safe_title'></a>";
+            echo "<button class='pin-button' type='button' data-pin-button>Pin</button></article>";
         }
     }
     

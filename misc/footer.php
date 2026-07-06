@@ -1,5 +1,6 @@
 <footer>
   <a href="https://github.com/Remake0992/Pinternext/" target="_blank" rel="noopener noreferrer">Source code</a>
+  <a href="./boards.php">Boards</a>
   <a href="./donate.php" target="_blank" rel="noopener noreferrer">Donate</a>
   <a href="https://github.com/Remake0992/Pinternext#legal-notice" target="_blank" rel="noopener noreferrer">Legal notice</a>
   <button class="theme-toggle" type="button" data-theme-toggle aria-label="Switch color theme">Theme</button>
@@ -10,5 +11,6 @@ if (isset($images)) {
 ?>
 </footer>
 <script src="/static/theme-toggle.js" defer></script>
+<script src="/static/pinternext-library.js" defer></script>
 </body>
 </html>
