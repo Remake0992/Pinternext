@@ -1,6 +1,6 @@
 <h2 align="center">Pinternext</h2>
 
-> A privacy-respecting Pinterest-style image search with no login prompts and no frontend JavaScript requirement.
+> A privacy-respecting Pinterest-style image search with no login prompts. Heavily vibe-coded.
 
 <div align="center">
 
