@@ -136,8 +136,9 @@ if ($result->bookmark !== null) {
     $bookmark_encoded = urlencode($result->bookmark);
     $csrftoken_encoded = $csrftoken ? urlencode($csrftoken) : "";
 
-    echo "<section class='next-page'><a class='button-link' href='/search.php?q=$query_encoded&bookmark=$bookmark_encoded&csrftoken=$csrftoken_encoded'>Load more ideas</a></section>";
+    echo "<section class='next-page' aria-live='polite'><a class='button-link' href='/search.php?q=$query_encoded&bookmark=$bookmark_encoded&csrftoken=$csrftoken_encoded'>Load more ideas</a></section>";
 }
 ?>
     </main>
+    <script src="/static/infinite-scroll.js" defer></script>
 <?php include "misc/footer.php"; ?>
