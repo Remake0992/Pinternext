@@ -1,7 +1,7 @@
 services:
-  binternet:
-    container_name: binternet
-    image: ghcr.io/ahwxorg/binternet:latest
+  pinternext:
+    container_name: pinternext
+    image: ghcr.io/remake0992/pinternext:latest
     cap_drop:
       - ALL
     security_opt:
