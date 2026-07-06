@@ -1272,6 +1272,10 @@ html[data-theme="dark"] footer a:hover {
     padding-bottom: 2rem;
   }
 
+  input {
+    font-size: 16px;
+  }
+
   .mainContainer {
     width: 100%;
   }
