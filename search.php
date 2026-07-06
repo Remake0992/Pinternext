@@ -15,16 +15,16 @@ require "misc/header.php";
     <form class="search-container" action="search.php" method="get" autocomplete="off" role="search">
         <h1><a class="no-decoration accent logo-wordmark" href="./"><span class="logo-dot">P</span>internext</a></h1>
         <div class="search-input-row">
-            <input type="text" name="q" placeholder="Search images" value="<?php echo $query_escaped; ?>" required maxlength="64">
+            <input type="text" name="q" placeholder="Search images" value="<?php echo $query_escaped; ?>" required maxlength="64" data-feed-input>
             <button type="submit">Search</button>
         </div>
-        <button class="secondary-button save-search-button" type="button" data-save-query="<?php echo $query_escaped; ?>">Save feed</button>
+        <button class="secondary-button save-search-button" type="button" data-save-feed>Save feed</button>
     </form>
 
     <main>
         <section class="results-heading" aria-labelledby="results-title">
             <h2 id="results-title">Ideas for “<?php echo $query_escaped; ?>”</h2>
-            <p>Scroll the masonry board, preview any pin, then save favorites to private boards.</p>
+            <p>Scroll the masonry board, open any pin, then save favorites to private boards.</p>
         </section>
 
 <?php

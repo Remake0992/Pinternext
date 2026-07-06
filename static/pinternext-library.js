@@ -69,48 +69,88 @@
     renderFeed();
   };
 
+  const fetchFeedImages = async (phrase) => {
+    const response = await fetch(`search.php?q=${encodeURIComponent(phrase)}`, {
+      headers: {
+        "X-Requested-With": "fetch"
+      }
+    });
+
+    if (!response.ok) {
+      throw new Error(`Feed request failed with status ${response.status}`);
+    }
+
+    const html = await response.text();
+    const doc = new DOMParser().parseFromString(html, "text/html");
+    return Array.from(doc.querySelectorAll(".img-container .img-result")).slice(0, 8);
+  };
+
   const renderFeed = () => {
     document.querySelectorAll("[data-feed-list]").forEach((container) => {
       const feed = getFeed();
+      const requestId = createId();
+      container.dataset.feedRequest = requestId;
       container.replaceChildren();
 
       if (feed.length === 0) {
         container.appendChild(createElement("p", {
           className: "empty-inline",
-          text: "No saved keywords yet. Search a phrase, then save it as a feed."
+          text: "No saved images yet. Search a phrase, then save it as a feed."
         }));
         return;
       }
 
-      feed.forEach((phrase) => {
-        const chip = createElement("span", { className: "feed-chip" });
-        const link = createElement("a", {
-          text: phrase,
-          attributes: {
-            href: `search.php?q=${encodeURIComponent(phrase)}`
+      container.appendChild(createElement("p", {
+        className: "empty-inline",
+        text: "Loading saved images…"
+      }));
+
+      Promise.all(feed.slice(0, 6).map((phrase) => fetchFeedImages(phrase).catch(() => []))).then((groups) => {
+        if (container.dataset.feedRequest !== requestId) {
+          return;
+        }
+
+        const seen = new Set();
+        container.replaceChildren();
+
+        groups.flat().forEach((image) => {
+          const imageUrl = image.dataset.imageUrl;
+
+          if (imageUrl && seen.has(imageUrl)) {
+            return;
           }
-        });
-        const remove = createElement("button", {
-          text: "Remove",
-          attributes: {
-            type: "button",
-            "aria-label": `Remove ${phrase} from feed`
+
+          if (imageUrl) {
+            seen.add(imageUrl);
           }
+
+          const clone = document.importNode(image, true);
+          clone.classList.add("feed-image");
+          container.appendChild(clone);
         });
 
-        remove.addEventListener("click", () => removeFeedPhrase(phrase));
-        chip.append(link, remove);
-        container.appendChild(chip);
+        if (container.children.length === 0) {
+          container.appendChild(createElement("p", {
+            className: "empty-inline",
+            text: "No feed images could be loaded yet. Try saving another search."
+          }));
+        }
       });
     });
   };
 
   const initFeedControls = () => {
     document.querySelectorAll("[data-save-feed]").forEach((button) => {
-      button.addEventListener("click", () => {
-        const form = button.closest("form");
-        const input = form?.querySelector("[data-feed-input], input[name='q']");
+      const form = button.closest("form");
+      const input = form?.querySelector("[data-feed-input], input[name='q']");
+      const updateVisibility = () => {
+        button.hidden = !normalizePhrase(input?.value || "");
+      };
 
+      input?.addEventListener("input", updateVisibility);
+      updateVisibility();
+
+      button.addEventListener("click", () => {
         if (input && addFeedPhrase(input.value)) {
           button.textContent = "Saved";
           window.setTimeout(() => {
@@ -121,9 +161,19 @@
     });
 
     document.querySelectorAll("[data-save-query]").forEach((button) => {
+      const form = button.closest("form");
+      const input = form?.querySelector("[data-feed-input], input[name='q']");
+      const getValue = () => input?.value || button.dataset.saveQuery || "";
+      const updateVisibility = () => {
+        button.hidden = !normalizePhrase(getValue());
+      };
+
+      input?.addEventListener("input", updateVisibility);
+      updateVisibility();
+
       button.addEventListener("click", () => {
-        if (addFeedPhrase(button.dataset.saveQuery || "")) {
-          button.textContent = "Saved feed";
+        if (addFeedPhrase(getValue())) {
+          button.textContent = "Saved";
           window.setTimeout(() => {
             button.textContent = "Save feed";
           }, 1400);
@@ -326,7 +376,7 @@
 
       if (coverPin) {
         cover.style.backgroundImage = `url("${coverPin.proxyUrl}")`;
-        cover.textContent = "Preview cover";
+        cover.textContent = "Open cover";
         cover.addEventListener("click", () => openPreview(coverPin));
       } else {
         cover.textContent = "No cover yet";
@@ -543,35 +593,16 @@
       attributes: {
         role: "dialog",
         "aria-modal": "true",
-        "aria-labelledby": "preview-dialog-title"
+        "aria-label": "Image preview"
       }
+    });
+    const close = createElement("button", {
+      className: "preview-close",
+      text: "Close",
+      attributes: { type: "button" }
     });
     const media = createElement("div", { className: "preview-media" });
-    const image = createElement("img", { attributes: { alt: "Pin preview", "data-preview-image": "" } });
-    const details = createElement("div", { className: "preview-details" });
-    const header = createElement("div", { className: "pin-dialog-header" });
-    const title = createElement("h2", { text: "Pin preview", attributes: { id: "preview-dialog-title", "data-preview-title": "" } });
-    const close = createElement("button", { text: "Close", attributes: { type: "button" } });
-    const sourceLink = createElement("a", {
-      className: "button-link",
-      text: "Open proxied image",
-      attributes: {
-        href: "#",
-        target: "_blank",
-        rel: "noopener noreferrer",
-        "data-preview-open": ""
-      }
-    });
-    const source = createElement("a", {
-      className: "preview-source",
-      text: "Original Pinterest image URL",
-      attributes: {
-        href: "#",
-        target: "_blank",
-        rel: "noopener noreferrer",
-        "data-preview-source": ""
-      }
-    });
+    const image = createElement("img", { attributes: { alt: "Image preview", "data-preview-image": "" } });
 
     close.addEventListener("click", () => {
       backdrop.hidden = true;
@@ -588,9 +619,7 @@
     });
 
     media.appendChild(image);
-    header.append(title, close);
-    details.append(header, sourceLink, source);
-    dialog.append(media, details);
+    dialog.append(close, media);
     backdrop.appendChild(dialog);
     document.body.appendChild(backdrop);
     return backdrop;
@@ -603,15 +632,9 @@
 
     previewDialog = previewDialog || createPreviewDialog();
     const image = previewDialog.querySelector("[data-preview-image]");
-    const title = previewDialog.querySelector("[data-preview-title]");
-    const openLink = previewDialog.querySelector("[data-preview-open]");
-    const sourceLink = previewDialog.querySelector("[data-preview-source]");
 
     image.src = pin.proxyUrl;
-    image.alt = pin.title || "Pin preview";
-    title.textContent = pin.title || "Pin preview";
-    openLink.href = pin.proxyUrl;
-    sourceLink.href = pin.url || pin.proxyUrl;
+    image.alt = pin.title || "Image preview";
     previewDialog.hidden = false;
   };
 
@@ -684,10 +707,6 @@
   };
 
   const initPinButtons = () => {
-    if (!document.querySelector("[data-pin-button]")) {
-      return;
-    }
-
     const dialog = createPinDialog();
     const boardList = dialog.querySelector("[data-pin-board-list]");
     const form = dialog.querySelector("[data-pin-create-board-form]");

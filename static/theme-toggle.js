@@ -35,8 +35,9 @@
 
     if (toggle) {
       const nextTheme = resolvedTheme === "light" ? "dark" : "light";
-      toggle.textContent = `${nextTheme.charAt(0).toUpperCase()}${nextTheme.slice(1)} mode`;
+      toggle.textContent = nextTheme === "dark" ? "☾" : "☀";
       toggle.setAttribute("aria-label", `Switch to ${nextTheme} mode`);
+      toggle.setAttribute("title", `Switch to ${nextTheme} mode`);
       toggle.setAttribute("aria-pressed", resolvedTheme === "dark" ? "true" : "false");
     }
   };
