@@ -1,9 +1,9 @@
 <?php require "misc/header.php"; ?>
-<title>Donate - Binternet</title>
+<title>Donate - Pinternext</title>
 </head>
 <body>
     <main class="donate-container">
-        <h2>Support Binternet</h2>
+        <h2>Support Pinternext</h2>
 
         <div class="qr-box">
           <div class="inner-wrap">

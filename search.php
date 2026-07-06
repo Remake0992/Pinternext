@@ -9,11 +9,11 @@ if (strlen($query) < 1 || strlen($query) > 64) {
 $query_escaped = htmlspecialchars($query, ENT_QUOTES, 'UTF-8');
 require "misc/header.php";
 ?>
-<title><?php echo $query_escaped; ?> - Binternet</title>
+<title><?php echo $query_escaped; ?> - Pinternext</title>
 </head>
 <body>
     <form class="search-container" action="search.php" method="get" autocomplete="off" role="search">
-        <h1><a class="no-decoration accent logo-wordmark" href="./"><span class="logo-dot">B</span>internet</a></h1>
+        <h1><a class="no-decoration accent logo-wordmark" href="./"><span class="logo-dot">P</span>internext</a></h1>
         <div class="search-input-row">
             <input type="text" name="q" placeholder="Search images" value="<?php echo $query_escaped; ?>" required maxlength="64">
             <button type="submit">Search</button>

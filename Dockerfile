@@ -10,10 +10,10 @@ RUN sed -i '/user nginx;/d' /etc/nginx/nginx.conf \
     && sed -i 's/;listen.mode/listen.mode/' /etc/php84/php-fpm.d/www.conf \
     && sed -i 's/;listen.allowed_clients/listen.allowed_clients/' /etc/php84/php-fpm.d/www.conf
 
-RUN mkdir -p /var/www/binternet /run/php
-COPY . /var/www/binternet
-COPY nginx.conf /etc/nginx/http.d/binternet.conf
-RUN rm /var/www/binternet/nginx.conf /etc/nginx/http.d/default.conf \
+RUN mkdir -p /var/www/pinternext /run/php
+COPY . /var/www/pinternext
+COPY nginx.conf /etc/nginx/http.d/pinternext.conf
+RUN rm /var/www/pinternext/nginx.conf /etc/nginx/http.d/default.conf \
     && chown -R nginx:nginx /var/log/php84/ /run
 
 USER nginx
