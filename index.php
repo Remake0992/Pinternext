@@ -20,7 +20,7 @@
                     <h2 id="feed-title">Your feed</h2>
                 </div>
                 <p>Save searches and their images will show up here.</p>
-                <div class="saved-feed-list feed-image-grid" data-feed-list></div>
+                <div class="saved-feed-list" data-feed-list></div>
             </section>
 
             <nav class="quick-searches" aria-label="Quick searches">

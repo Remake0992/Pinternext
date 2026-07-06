@@ -100,10 +100,37 @@
         return;
       }
 
-      container.appendChild(createElement("p", {
+      const manager = createElement("div", { className: "feed-manager" });
+      const managerLabel = createElement("p", { text: "Saved feeds" });
+      const managerChips = createElement("div", { className: "feed-manager-chips" });
+      const imageGrid = createElement("div", { className: "feed-image-grid" });
+
+      feed.forEach((phrase) => {
+        const chip = createElement("span", { className: "feed-manager-chip" });
+        const link = createElement("a", {
+          text: phrase,
+          attributes: { href: `search.php?q=${encodeURIComponent(phrase)}` }
+        });
+        const remove = createElement("button", {
+          className: "feed-remove-button",
+          text: "×",
+          attributes: {
+            type: "button",
+            "aria-label": `Remove ${phrase} from saved feeds`
+          }
+        });
+
+        remove.addEventListener("click", () => removeFeedPhrase(phrase));
+        chip.append(link, remove);
+        managerChips.appendChild(chip);
+      });
+
+      manager.append(managerLabel, managerChips);
+      imageGrid.appendChild(createElement("p", {
         className: "empty-inline",
         text: "Loading saved images…"
       }));
+      container.append(manager, imageGrid);
 
       Promise.all(feed.slice(0, 6).map((phrase) => fetchFeedImages(phrase).catch(() => []))).then((groups) => {
         if (container.dataset.feedRequest !== requestId) {
@@ -111,7 +138,7 @@
         }
 
         const seen = new Set();
-        container.replaceChildren();
+        imageGrid.replaceChildren();
 
         groups.flat().forEach((image) => {
           const imageUrl = image.dataset.imageUrl;
@@ -126,11 +153,11 @@
 
           const clone = document.importNode(image, true);
           clone.classList.add("feed-image");
-          container.appendChild(clone);
+          imageGrid.appendChild(clone);
         });
 
-        if (container.children.length === 0) {
-          container.appendChild(createElement("p", {
+        if (imageGrid.children.length === 0) {
+          imageGrid.appendChild(createElement("p", {
             className: "empty-inline",
             text: "No feed images could be loaded yet. Try saving another search."
           }));
