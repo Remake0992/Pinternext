@@ -1,15 +1,9 @@
-<?php
-    require "misc/header.php";
-
-?>
-
-    <title>LibreY - Donate</title>
-    </head>
-    <body>
-    <div class="donate-container">
-        <h2>
-          Donate Me
-        </h2>
+<?php require "misc/header.php"; ?>
+<title>Donate - Binternet</title>
+</head>
+<body>
+    <main class="donate-container">
+        <h2>Support Binternet</h2>
 
         <div class="qr-box">
           <div class="inner-wrap">
@@ -27,25 +21,22 @@
         </div>
           
         <div class="flex-row">
-          <a href="https://ko-fi.com/Ahwxorg" target="_blank"
+          <a href="https://ko-fi.com/Ahwxorg" target="_blank" rel="noopener noreferrer"
             ><img
               src="/static/img/kofi.png"
-              alt="kifi img"
+              alt="Ko-fi"
               height="50"
               width="auto"
           /></a>
 
-          <a href="https://www.buymeacoffee.com/ahwx" target="_blank">
+          <a href="https://www.buymeacoffee.com/ahwx" target="_blank" rel="noopener noreferrer">
             <img
               src="/static/img/buy-me-a-coffee.png"
               height="50"
               width="auto"
-              alt="buy-me-a-coffee img"
+              alt="Buy Me a Coffee"
           /></a>
         </div>
-      </div>
-    </div>
-
-        
+    </main>
 
 <?php require "misc/footer.php"; ?>

@@ -1,24 +1,31 @@
-<?php require "misc/header.php"; ?>
-<title>
 <?php
-$query = htmlspecialchars(trim($_REQUEST["q"] ?? ''));
-echo $query ?: 'Search' . ' - Binternet';
-?> - Binternet</title>
+$query = trim($_REQUEST["q"] ?? '');
+
+if (strlen($query) < 1 || strlen($query) > 64) {
+    header("Location: ./");
+    exit();
+}
+
+$query_escaped = htmlspecialchars($query, ENT_QUOTES, 'UTF-8');
+require "misc/header.php";
+?>
+<title><?php echo $query_escaped; ?> - Binternet</title>
 </head>
 <body>
-    <form class="search-container" method="get" autocomplete="off">
-        <h1><a class="no-decoration accent" href="./">Binternet</a></h1>
-        <input type="text" name="q" placeholder="Search Image"
-            <?php
-            // Validate query length
-            if (strlen($query) < 1 || strlen($query) > 64) {
-                header("Location: ./");
-                exit();
-            }
-            echo "value=\"" . htmlspecialchars($query) . "\"";
-            ?>
-        >
+    <form class="search-container" action="search.php" method="get" autocomplete="off" role="search">
+        <h1><a class="no-decoration accent logo-wordmark" href="./"><span class="logo-dot">B</span>internet</a></h1>
+        <div class="search-input-row">
+            <input type="text" name="q" placeholder="Search images" value="<?php echo $query_escaped; ?>" required maxlength="64">
+            <button type="submit">Search</button>
+        </div>
+        <span class="search-meta">Private image discovery</span>
     </form>
+
+    <main>
+        <section class="results-heading" aria-labelledby="results-title">
+            <h2 id="results-title">Ideas for “<?php echo $query_escaped; ?>”</h2>
+            <p>Scroll the masonry board, then open any pin through the image proxy.</p>
+        </section>
 
 <?php
 // Fetching query and optional parameters
@@ -83,6 +90,7 @@ $prepare_search_curl_obj = function ($query, $bookmark) use ($url, $header_funct
 $search = function ($query, $bookmark) use ($prepare_search_curl_obj) {
     $ch = $prepare_search_curl_obj($query, $bookmark);
     $response = curl_exec($ch);
+    curl_close($ch);
     $data = json_decode($response);
     
     $images = [];
@@ -90,16 +98,23 @@ $search = function ($query, $bookmark) use ($prepare_search_curl_obj) {
     
     if ($data && isset($data->resource_response->data->results)) {
         foreach ($data->resource_response->data->results as $result) {
-            $image = $result->images->orig;
-            $url = $image->url;
+            if (!isset($result->images->orig->url)) {
+                continue;
+            }
+
+            $url = $result->images->orig->url;
             $images[] = $url;
-            echo "<a class='img-result' href='/image_proxy.php?url=" . htmlspecialchars($url) . "'>";
-            echo "<img loading='lazy' src='/image_proxy.php?url=" . htmlspecialchars($url) . "'></a>";
+            $proxy_url = "/image_proxy.php?url=" . urlencode($url);
+            $safe_proxy_url = htmlspecialchars($proxy_url, ENT_QUOTES, 'UTF-8');
+            echo "<a class='img-result' href='$safe_proxy_url' target='_blank' rel='noopener noreferrer'>";
+            echo "<img loading='lazy' decoding='async' src='$safe_proxy_url' alt='Pinterest result for " . htmlspecialchars($query, ENT_QUOTES, 'UTF-8') . "'></a>";
         }
-    } else {
-        echo "<p>No results found.</p>";
     }
     
+    if (count($images) === 0) {
+        echo "<div class='empty-state'><h2>No results found</h2><p>Try another search term or check back later.</p></div>";
+    }
+
     echo "</div>";
     
     $result = new SearchResult();
@@ -113,6 +128,7 @@ $search = function ($query, $bookmark) use ($prepare_search_curl_obj) {
 };
 
 $result = $search($query, $bookmark);
+$images = $result->images;
 
 // Pagination link for the next page
 if ($result->bookmark !== null) {
@@ -120,8 +136,8 @@ if ($result->bookmark !== null) {
     $bookmark_encoded = urlencode($result->bookmark);
     $csrftoken_encoded = $csrftoken ? urlencode($csrftoken) : "";
 
-    echo "<h2 style=\"text-align: center;\"><a href=\"/search.php?q=$query_encoded&bookmark=$bookmark_encoded&csrftoken=$csrftoken_encoded\">Next page</a></h2><br><br><br>";
+    echo "<section class='next-page'><a class='button-link' href='/search.php?q=$query_encoded&bookmark=$bookmark_encoded&csrftoken=$csrftoken_encoded'>Load more ideas</a></section>";
 }
-
-include "misc/footer.php";
 ?>
+    </main>
+<?php include "misc/footer.php"; ?>
