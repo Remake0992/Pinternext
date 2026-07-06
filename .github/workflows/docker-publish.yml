@@ -3,14 +3,16 @@ name: Build and Push to GHCR
 on:
   push:
     branches:
-      - main  # change to master if that's your default branch
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  packages: write
 
 jobs:
   build-and-push:
     runs-on: ubuntu-latest
-    permissions:
-      contents: read
-      packages: write
 
     steps:
       - name: Checkout repo
@@ -24,8 +26,10 @@ jobs:
           password: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Build and push image
-        uses: docker/build-push-action@v5
+        uses: docker/build-push-action@v6
         with:
           context: .
           push: true
-          tags: ghcr.io/remake0992/pinternext:latest
+          tags: |
+            ghcr.io/remake0992/pinternext:latest
+            ghcr.io/remake0992/pinternext:${{ github.sha }}
