@@ -1470,6 +1470,10 @@ html[data-theme="dark"] footer a:hover {
     width: 100%;
   }
 
+  .board-create-form input {
+    flex: 0 1 auto;
+  }
+
   .boards-grid {
     grid-template-columns: 1fr;
     gap: 0.85rem;
