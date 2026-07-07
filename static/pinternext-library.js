@@ -22,9 +22,20 @@
 
   const normalizePhrase = (phrase) => phrase.trim().replace(/\s+/g, " ").slice(0, 64);
 
-  const getFeed = () => readJson(feedKey, []);
+  const getFeed = () => {
+    const feed = readJson(feedKey, []);
+
+    if (!Array.isArray(feed)) {
+      return [];
+    }
+
+    return feed.map((phrase) => normalizePhrase(String(phrase || ""))).filter(Boolean);
+  };
   const saveFeed = (feed) => writeJson(feedKey, feed);
-  const getBoards = () => readJson(boardsKey, []);
+  const getBoards = () => {
+    const boards = readJson(boardsKey, []);
+    return Array.isArray(boards) ? boards : [];
+  };
   const saveBoards = (boards) => writeJson(boardsKey, boards);
   const createId = () => `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
 
@@ -61,15 +72,15 @@
       saveFeed(feed);
     }
 
-    renderFeed();
     renderFeedKeywords();
+    renderFeed();
     return true;
   };
 
   const removeFeedPhrase = (phrase) => {
     saveFeed(getFeed().filter((item) => item !== phrase));
-    renderFeed();
     renderFeedKeywords();
+    renderFeed();
   };
 
   const fetchFeedImages = async (phrase, bookmark = null) => {
@@ -111,6 +122,10 @@
 
     document.querySelectorAll("[data-feed-count]").forEach((counter) => {
       counter.textContent = `${feed.length} saved`;
+    });
+
+    document.querySelectorAll("[data-home-feed-panel]").forEach((panel) => {
+      panel.hidden = feed.length === 0;
     });
 
     document.querySelectorAll("[data-feed-keywords]").forEach((container) => {
@@ -171,10 +186,11 @@
         return;
       }
 
+      const showManager = container.dataset.feedList !== "home";
       const manager = createElement("div", { className: "feed-manager" });
       const managerLabel = createElement("p", { text: "Saved feeds" });
       const managerChips = createElement("div", { className: "feed-manager-chips" });
-      const imageGrid = createElement("div", { className: "feed-image-grid" });
+      const imageGrid = createElement("div", { className: `feed-image-grid${showManager ? "" : " home-feed-image-grid"}` });
       const status = createElement("p", {
         className: "feed-load-status",
         text: "Loading saved images…"
@@ -209,7 +225,12 @@
         className: "empty-inline",
         text: "Loading saved images…"
       }));
-      container.append(manager, imageGrid, status, sentinel);
+
+      if (showManager) {
+        container.append(manager, imageGrid, status, sentinel);
+      } else {
+        container.append(imageGrid, status, sentinel);
+      }
 
       const seen = new Set();
       const phraseState = new Map();
@@ -696,67 +717,6 @@
     return { renameForm, renameInput };
   };
 
-  const renderOpenBoard = (container, board) => {
-    container.classList.add("is-board-open");
-
-    const panel = createElement("article", {
-      className: "board-detail-panel",
-      attributes: { "data-board-id": board.id }
-    });
-    const back = createElement("button", {
-      className: "secondary-button compact-button board-back-button",
-      text: "All boards",
-      attributes: { type: "button" }
-    });
-    const header = createElement("div", { className: "board-detail-header" });
-    const title = createElement("div", { className: "board-title" });
-    const actions = createElement("div", { className: "board-actions" });
-    const renameButton = createElement("button", {
-      className: "secondary-button compact-button",
-      text: "Rename",
-      attributes: { type: "button" }
-    });
-    const deleteButton = createElement("button", {
-      className: "secondary-button compact-button",
-      text: "Delete board",
-      attributes: { type: "button" }
-    });
-    const { renameForm, renameInput } = createBoardRenameForm(board);
-    const masonry = createElement("div", { className: "board-open-masonry" });
-
-    back.addEventListener("click", closeBoard);
-    title.append(
-      createElement("h2", { text: board.name }),
-      createElement("p", { text: `${(board.pins || []).length} pins` })
-    );
-    renameButton.addEventListener("click", () => {
-      renameForm.hidden = !renameForm.hidden;
-      if (!renameForm.hidden) {
-        renameInput.focus();
-        renameInput.select();
-      }
-    });
-    deleteButton.addEventListener("click", () => {
-      closeBoard();
-      deleteBoard(board.id);
-    });
-
-    actions.append(renameButton, deleteButton);
-    header.append(title, actions);
-
-    if ((board.pins || []).length === 0) {
-      masonry.appendChild(createElement("p", {
-        className: "empty-inline",
-        text: "This board is empty. Search for ideas and hit Pin."
-      }));
-    } else {
-      (board.pins || []).forEach((pin) => masonry.appendChild(createBoardPinItem(board, pin)));
-    }
-
-    panel.append(back, header, renameForm, masonry);
-    container.appendChild(panel);
-  };
-
   const renderBoardsPage = () => {
     const container = document.querySelector("[data-boards-list]");
 
@@ -767,6 +727,10 @@
     const boards = getBoards();
     const openBoardId = getOpenBoardId();
     const selectedBoard = openBoardId ? boards.find((board) => board.id === openBoardId) : null;
+
+    if (openBoardId && !selectedBoard) {
+      expandedBoardId = null;
+    }
 
     container.classList.toggle("is-board-open", Boolean(selectedBoard));
     container.replaceChildren();
@@ -779,10 +743,6 @@
       );
       container.appendChild(empty);
       return;
-    }
-
-    if (openBoardId && !selectedBoard) {
-      window.history.replaceState("", document.title, window.location.pathname + window.location.search);
     }
 
     boards.forEach((board) => {
@@ -800,7 +760,7 @@
       });
       const header = createElement("div", { className: "board-card-header" });
       const title = createElement("div", { className: "board-title" });
-      const actions = createElement("div", { className: "board-actions" });
+      const actions = createElement("div", { className: "board-actions board-quick-actions" });
       const dragHandle = createElement("button", {
         className: "secondary-button compact-button drag-handle",
         text: "Drag",
@@ -1167,8 +1127,9 @@
     });
   };
 
-  renderFeed();
   renderFeedKeywords();
+  renderFeed();
+
   initFeedControls();
   initBoardsPage();
   initPreviewViewer();

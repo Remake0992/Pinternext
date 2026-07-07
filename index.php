@@ -2,7 +2,7 @@
 <title>Pinternext</title>
 </head>
 <body>
-    <main class="mainContainer centered">
+    <main class="mainContainer home-page">
         <section class="hero-panel" aria-labelledby="bodyHeader">
             <h1 id="bodyHeader"><span class="logo-dot">P</span>internext</h1>
             <p class="hero-copy">A private, no-login way to discover visual inspiration from Pinterest-style image boards.</p>
@@ -26,6 +26,17 @@
                 <div data-feed-keywords></div>
             </section>
 
+        </section>
+
+        <section class="home-saved-feed-panel" aria-labelledby="home-feed-title" data-home-feed-panel hidden>
+            <div class="home-feed-panel-header">
+                <div>
+                    <p class="eyebrow-label">Made from your saved feeds</p>
+                    <h2 id="home-feed-title">Ideas picked for you</h2>
+                </div>
+                <a class="secondary-button compact-button" href="search.php?q=inspiration">Explore more</a>
+            </div>
+            <div data-feed-list="home"></div>
         </section>
     </main>
 <?php require "misc/footer.php"; ?>
