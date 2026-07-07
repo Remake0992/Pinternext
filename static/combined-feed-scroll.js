@@ -153,6 +153,9 @@
 
   // Utility: Append images to grid (deduplicating by image URL)
   const appendImages = (images) => {
+    const fragment = document.createDocumentFragment();
+    let appendedCount = 0;
+
     images.forEach((image) => {
       const imageUrl = image.dataset.imageUrl;
 
@@ -166,8 +169,15 @@
 
       const clone = document.importNode(image, true);
       clone.classList.add("feed-image");
-      feedImageGrid.appendChild(clone);
+      fragment.appendChild(clone);
+      appendedCount += 1;
     });
+
+    if (appendedCount > 0) {
+      feedImageGrid.appendChild(fragment);
+    }
+
+    return appendedCount;
   };
 
   // Main: Load next page of combined feed
@@ -214,8 +224,10 @@
       }
 
       if (result.images.length > 0) {
-        addedAny = true;
-        appendImages(result.images);
+        const appendedCount = appendImages(result.images);
+        if (appendedCount > 0) {
+          addedAny = true;
+        }
       }
 
       if (result.nextBookmark) {

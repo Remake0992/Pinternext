@@ -108,9 +108,18 @@ $search = function ($query, $bookmark) use ($prepare_search_curl_obj) {
             $safe_proxy_url = htmlspecialchars($proxy_url, ENT_QUOTES, 'UTF-8');
             $safe_source_url = htmlspecialchars($url, ENT_QUOTES, 'UTF-8');
             $safe_title = htmlspecialchars($query, ENT_QUOTES, 'UTF-8');
-            echo "<article class='img-result' data-image-url='$safe_source_url' data-proxy-url='$safe_proxy_url' data-pin-title='$safe_title'>";
+
+            $image_width = isset($result->images->orig->width) ? (int) $result->images->orig->width : 0;
+            $image_height = isset($result->images->orig->height) ? (int) $result->images->orig->height : 0;
+            $has_dimensions = $image_width > 0 && $image_height > 0;
+
+            $dimension_attrs = $has_dimensions ? " width='$image_width' height='$image_height'" : "";
+            $aspect_ratio_style = $has_dimensions ? " style='aspect-ratio: {$image_width} / {$image_height};'" : "";
+            $dimension_data_attrs = $has_dimensions ? " data-image-width='$image_width' data-image-height='$image_height'" : "";
+
+            echo "<article class='img-result' data-image-url='$safe_source_url' data-proxy-url='$safe_proxy_url' data-pin-title='$safe_title'$dimension_data_attrs>";
             echo "<a class='pin-open-link' href='$safe_proxy_url' rel='noopener noreferrer'>";
-            echo "<img loading='lazy' decoding='async' src='$safe_proxy_url' alt='Pinterest result for $safe_title'></a>";
+            echo "<img loading='lazy' decoding='async' src='$safe_proxy_url' alt='Pinterest result for $safe_title'$dimension_attrs$aspect_ratio_style></a>";
             echo "<button class='pin-button' type='button' data-pin-button>Pin</button></article>";
         }
     }
