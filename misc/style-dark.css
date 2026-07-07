@@ -304,9 +304,21 @@ button:hover,
   font-size: 0.95rem;
 }
 
+.feed-load-more {
+  display: block;
+  width: max-content;
+  margin: 0 auto 1.5rem;
+  border: 0;
+  cursor: pointer;
+}
+
 .feed-sentinel {
   width: 100%;
   height: 1px;
+}
+
+.feed-sentinel[hidden] {
+  display: none;
 }
 
 .feed-chip,
