@@ -69,8 +69,13 @@
     renderFeed();
   };
 
-  const fetchFeedImages = async (phrase) => {
-    const response = await fetch(`search.php?q=${encodeURIComponent(phrase)}`, {
+  const fetchFeedImages = async (phrase, bookmark = null) => {
+    const params = new URLSearchParams({ q: phrase });
+    if (bookmark) {
+      params.set("bookmark", bookmark);
+    }
+
+    const response = await fetch(`search.php?${params.toString()}`, {
       headers: {
         "X-Requested-With": "fetch"
       }
@@ -82,7 +87,20 @@
 
     const html = await response.text();
     const doc = new DOMParser().parseFromString(html, "text/html");
-    return Array.from(doc.querySelectorAll(".img-container .img-result")).slice(0, 8);
+    const images = Array.from(doc.querySelectorAll(".img-container .img-result"));
+    const nextLink = doc.querySelector(".next-page a");
+    let nextBookmark = null;
+
+    if (nextLink) {
+      try {
+        const nextUrl = new URL(nextLink.href, window.location.href);
+        nextBookmark = nextUrl.searchParams.get("bookmark");
+      } catch (error) {
+        nextBookmark = null;
+      }
+    }
+
+    return { images, nextBookmark };
   };
 
   const renderFeed = () => {
@@ -104,6 +122,14 @@
       const managerLabel = createElement("p", { text: "Saved feeds" });
       const managerChips = createElement("div", { className: "feed-manager-chips" });
       const imageGrid = createElement("div", { className: "feed-image-grid" });
+      const status = createElement("p", {
+        className: "feed-load-status",
+        text: "Loading saved images…"
+      });
+      const sentinel = createElement("div", {
+        className: "feed-sentinel",
+        attributes: { hidden: "" }
+      });
 
       feed.forEach((phrase) => {
         const chip = createElement("span", { className: "feed-manager-chip" });
@@ -130,17 +156,23 @@
         className: "empty-inline",
         text: "Loading saved images…"
       }));
-      container.append(manager, imageGrid);
+      container.append(manager, imageGrid, status, sentinel);
 
-      Promise.all(feed.slice(0, 6).map((phrase) => fetchFeedImages(phrase).catch(() => []))).then((groups) => {
-        if (container.dataset.feedRequest !== requestId) {
-          return;
-        }
+      const seen = new Set();
+      const phraseState = new Map();
+      feed.slice(0, 6).forEach((phrase) => {
+        phraseState.set(phrase, { bookmark: null, exhausted: false, seen: new Set() });
+      });
 
-        const seen = new Set();
-        imageGrid.replaceChildren();
+      let isLoadingMore = false;
+      let allExhausted = false;
 
-        groups.flat().forEach((image) => {
+      const setStatus = (text) => {
+        status.textContent = text;
+      };
+
+      const appendImages = (images) => {
+        images.forEach((image) => {
           const imageUrl = image.dataset.imageUrl;
 
           if (imageUrl && seen.has(imageUrl)) {
@@ -155,14 +187,137 @@
           clone.classList.add("feed-image");
           imageGrid.appendChild(clone);
         });
+      };
 
-        if (imageGrid.children.length === 0) {
+      const clearPlaceholder = () => {
+        const placeholder = imageGrid.querySelector(".empty-inline");
+        if (placeholder) {
+          placeholder.remove();
+        }
+      };
+
+      const showEnd = () => {
+        sentinel.remove();
+        setStatus("You've reached the end of your saved feeds.");
+      };
+
+      const showErrorStatus = () => {
+        setStatus("Couldn't load more. Scroll again to retry.");
+      };
+
+      const maybeShowSentinel = () => {
+        if (allExhausted) {
+          return;
+        }
+        sentinel.hidden = false;
+        setStatus("Scroll to load more ideas…");
+      };
+
+      const loadPage = async () => {
+        if (isLoadingMore || allExhausted) {
+          return;
+        }
+
+        const phrases = feed.slice(0, 6).filter((phrase) => {
+          const state = phraseState.get(phrase);
+          return state && !state.exhausted;
+        });
+
+        if (phrases.length === 0) {
+          allExhausted = true;
+          showEnd();
+          return;
+        }
+
+        isLoadingMore = true;
+        sentinel.hidden = true;
+        setStatus("Loading more ideas…");
+
+        const results = await Promise.all(phrases.map((phrase) => {
+          const state = phraseState.get(phrase);
+          return fetchFeedImages(phrase, state.bookmark).then((result) => ({ phrase, result })).catch(() => ({ phrase, result: null }));
+        }));
+
+        if (container.dataset.feedRequest !== requestId) {
+          return;
+        }
+
+        let anyNewImages = false;
+        let errored = false;
+
+        results.forEach(({ phrase, result }) => {
+          const state = phraseState.get(phrase);
+          if (!state) {
+            return;
+          }
+
+          if (!result) {
+            errored = true;
+            return;
+          }
+
+          const freshImages = result.images.filter((image) => {
+            const url = image.dataset.imageUrl;
+            if (url && state.seen.has(url)) {
+              return false;
+            }
+            if (url) {
+              state.seen.add(url);
+            }
+            return true;
+          });
+
+          if (freshImages.length > 0) {
+            anyNewImages = true;
+            clearPlaceholder();
+            appendImages(freshImages);
+          }
+
+          if (result.nextBookmark) {
+            state.bookmark = result.nextBookmark;
+          } else {
+            state.exhausted = true;
+          }
+        });
+
+        if (imageGrid.children.length === 0 && !anyNewImages) {
           imageGrid.appendChild(createElement("p", {
             className: "empty-inline",
             text: "No feed images could be loaded yet. Try saving another search."
           }));
         }
-      });
+
+        isLoadingMore = false;
+
+        const remaining = feed.slice(0, 6).some((phrase) => {
+          const state = phraseState.get(phrase);
+          return state && !state.exhausted;
+        });
+
+        if (!remaining) {
+          allExhausted = true;
+          showEnd();
+        } else if (errored && !anyNewImages) {
+          showErrorStatus();
+          sentinel.hidden = false;
+        } else {
+          maybeShowSentinel();
+        }
+      };
+
+      if (!("IntersectionObserver" in window)) {
+        loadPage();
+        return;
+      }
+
+      const observer = new IntersectionObserver((entries) => {
+        if (entries.some((entry) => entry.isIntersecting)) {
+          loadPage();
+        }
+      }, { rootMargin: "900px 0px" });
+
+      observer.observe(sentinel);
+      loadPage();
     });
   };
 

@@ -22,13 +22,6 @@
                 <p>Save searches and their images will show up here.</p>
                 <div class="saved-feed-list" data-feed-list></div>
             </section>
-
-            <nav class="quick-searches" aria-label="Quick searches">
-                <a href="search.php?q=interior%20design">Interior design</a>
-                <a href="search.php?q=streetwear">Streetwear</a>
-                <a href="search.php?q=recipes">Recipes</a>
-                <a href="search.php?q=wallpaper">Wallpaper</a>
-            </nav>
         </section>
     </main>
 <?php require "misc/footer.php"; ?>
