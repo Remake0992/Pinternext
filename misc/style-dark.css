@@ -161,7 +161,6 @@ button:hover,
 }
 
 .boards-hero,
-.board-card,
 .pin-dialog,
 .preview-dialog {
   background: var(--surface);
@@ -171,7 +170,6 @@ button:hover,
 }
 
 .section-title-row,
-.board-card-header,
 .pin-dialog-header {
   display: flex;
   align-items: flex-start;
@@ -180,13 +178,11 @@ button:hover,
 }
 
 .section-title-row h2,
-.board-card-header h2,
 .pin-dialog-header h2 {
   margin: 0;
 }
 
 .section-title-row p,
-.board-card-header p,
 .pin-dialog-status {
   margin: 0;
   color: var(--muted-color);
@@ -218,6 +214,8 @@ button:hover,
   box-shadow: none;
 }
 
+/* ── Boards page layout ────────────────────────────────────────── */
+
 .boards-page {
   width: min(1180px, calc(100% - 2rem));
   margin: 0 auto;
@@ -226,7 +224,7 @@ button:hover,
 
 .boards-hero {
   width: min(760px, 100%);
-  margin: 0 auto 1.5rem;
+  margin: 0 auto 2rem;
   padding: clamp(1.5rem, 4vw, 2.5rem);
 }
 
@@ -241,10 +239,12 @@ button:hover,
   min-width: 0;
 }
 
+/* ── Pinterest-style grid ───────────────────────────────────────── */
+
 .boards-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
-  gap: 1rem;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 1.25rem;
   width: 100%;
   margin: 0 auto;
 }
@@ -255,74 +255,178 @@ button:hover,
   margin: 0;
 }
 
+/* ── Board card ─────────────────────────────────────────────────── */
+
 .board-card {
-  display: grid;
-  gap: 1rem;
-  padding: 1.2rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  background: var(--surface);
+  border: 1px solid var(--border-color);
+  border-radius: 20px;
+  overflow: hidden;
+  box-shadow: 0 2px 12px rgba(0,0,0,0.12);
+  transition: box-shadow 200ms ease, transform 200ms ease;
 }
 
-.board-card.is-dragging,
+.board-card:hover {
+  box-shadow: 0 8px 30px rgba(0,0,0,0.22);
+  transform: translateY(-2px);
+}
+
+.board-card.is-dragging {
+  opacity: 0.45;
+}
+
 .board-pin.is-dragging {
   opacity: 0.45;
 }
 
-.board-cover {
-  position: relative;
+/* ── Mosaic cover ───────────────────────────────────────────────── */
+
+.board-mosaic {
   display: grid;
-  place-items: end start;
-  min-height: 12rem;
-  width: 100%;
-  padding: 1rem;
+  grid-template-columns: 2fr 1fr;
+  grid-template-rows: 1fr;
+  aspect-ratio: 1.45 / 1;
+  cursor: pointer;
   overflow: hidden;
-  text-align: left;
-  background-color: var(--surface-strong);
-  background-position: center;
-  background-size: cover;
-  border-radius: 20px;
-  box-shadow: inset 0 -5rem 4rem rgba(0, 0, 0, 0.45);
+  background: var(--surface-strong);
+  flex-shrink: 0;
 }
 
-.board-cover:hover {
-  box-shadow: inset 0 -5rem 4rem rgba(0, 0, 0, 0.5), 0 16px 34px rgba(0, 0, 0, 0.25);
+.board-mosaic-main {
+  grid-column: 1;
+  grid-row: 1;
+  overflow: hidden;
 }
 
-.board-cover-empty,
-.board-cover-empty:hover {
-  cursor: default;
+.board-mosaic-main img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+  transition: transform 240ms ease;
+}
+
+.board-mosaic:hover .board-mosaic-main img {
+  transform: scale(1.04);
+}
+
+.board-mosaic-aside {
+  grid-column: 2;
+  grid-row: 1;
+  display: grid;
+  grid-template-rows: repeat(3, 1fr);
+  gap: 2px;
+  padding-left: 2px;
+}
+
+.board-mosaic-cell {
+  overflow: hidden;
+}
+
+.board-mosaic-cell img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+  transition: transform 240ms ease;
+}
+
+.board-mosaic:hover .board-mosaic-cell img {
+  transform: scale(1.06);
+}
+
+.board-mosaic-empty {
+  grid-column: 1 / -1;
+  display: grid;
+  place-items: center;
   color: var(--muted-color);
-  background: var(--surface);
-  box-shadow: none;
-  transform: none;
+  font-size: 0.9rem;
+  height: 100%;
 }
 
-.board-actions,
-.board-pin-actions {
+/* ── Board meta row (always visible) ───────────────────────────── */
+
+.board-meta {
   display: flex;
-  flex-wrap: wrap;
-  gap: 0.45rem;
-  justify-content: flex-end;
-}
-
-.board-title {
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  padding: 0.75rem 0.9rem 0.7rem;
   min-width: 0;
 }
 
-.board-title h2 {
-  overflow-wrap: anywhere;
-}
-
-.board-rename-form {
+.board-meta-left {
   display: flex;
-  flex-wrap: wrap;
-  gap: 0.55rem;
+  flex-direction: column;
+  gap: 0.1rem;
+  min-width: 0;
+  flex: 1;
 }
 
-.board-rename-form[hidden] {
-  display: none;
+.board-name {
+  font-weight: 700;
+  font-size: 0.95rem;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  line-height: 1.3;
 }
 
-.board-rename-form input {
-  flex: 1 1 12rem;
+.board-count {
+  font-size: 0.78rem;
+  color: var(--muted-color);
+  line-height: 1.2;
+}
+
+.board-meta-right {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+  flex-shrink: 0;
+}
+
+/* ── Icon buttons ───────────────────────────────────────────────── */
+
+.board-icon-btn {
+  display: inline-grid;
+  place-items: center;
+  width: 2rem;
+  height: 2rem;
+  padding: 0;
+  color: var(--muted-color);
+  background: transparent;
+  border: none;
+  border-radius: 50%;
+  box-shadow: none;
+  transition: background 140ms ease, color 140ms ease, transform 140ms ease;
+  flex-shrink: 0;
+}
+
+.board-icon-btn:hover {
+  color: var(--fg-color);
+  background: var(--surface-strong);
+  transform: none;
+  box-shadow: none;
+}
+
+.board-icon-btn--danger:hover {
+  color: var(--accent-color);
+  background: rgba(230, 0, 35, 0.12);
+}
+
+.board-icon-btn--active {
+  color: var(--accent-color);
+}
+
+.board-chevron svg {
+  transition: transform 220ms ease;
+}
+
+.board-chevron.is-open svg {
+  transform: rotate(180deg);
 }
 
 .drag-handle {
@@ -333,33 +437,122 @@ button:hover,
   cursor: grabbing;
 }
 
+/* ── Rename form ────────────────────────────────────────────────── */
+
+.board-rename-form {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.55rem;
+  padding: 0 0.9rem 0.75rem;
+}
+
+.board-rename-form[hidden] {
+  display: none;
+}
+
+.board-rename-form input {
+  flex: 1 1 8rem;
+  font-size: 0.88rem;
+  padding: 0.6rem 0.9rem;
+}
+
+.board-rename-form button {
+  padding: 0.6rem 1rem;
+  font-size: 0.88rem;
+}
+
+/* ── Expandable board body ──────────────────────────────────────── */
+
+.board-body {
+  border-top: 1px solid var(--border-color);
+  padding: 0.85rem;
+  animation: board-open 180ms ease;
+}
+
+.board-body[hidden] {
+  display: none;
+}
+
+@keyframes board-open {
+  from { opacity: 0; transform: translateY(-6px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+/* ── Pin masonry grid inside board ─────────────────────────────── */
+
 .board-pin-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(8.5rem, 1fr));
-  gap: 0.75rem;
+  column-count: auto;
+  column-width: 8rem;
+  column-gap: 0.6rem;
 }
 
 .board-pin {
-  display: grid;
-  gap: 0.55rem;
-  align-content: start;
+  break-inside: avoid;
+  position: relative;
+  margin-bottom: 0.6rem;
+  border-radius: 14px;
+  overflow: hidden;
+  background: var(--surface-strong);
 }
 
 .board-pin a {
   display: block;
   overflow: hidden;
-  border-radius: 18px;
-  background: var(--surface-strong);
+  border-radius: 14px;
 }
 
 .board-pin img {
   width: 100%;
   height: auto;
+  display: block;
+  border-radius: 14px;
+  transition: transform 220ms ease;
 }
 
-.board-pin-actions .compact-button {
-  padding: 0.55rem 0.7rem;
-  font-size: 0.78rem;
+.board-pin:hover img {
+  transform: scale(1.03);
+}
+
+/* pin action overlay — shown on hover */
+.board-pin-overlay {
+  position: absolute;
+  top: 0.4rem;
+  right: 0.4rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.22rem;
+  opacity: 0;
+  transition: opacity 160ms ease;
+  pointer-events: none;
+}
+
+.board-pin:hover .board-pin-overlay {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.board-pin-overlay .board-icon-btn {
+  width: 1.8rem;
+  height: 1.8rem;
+  background: rgba(0,0,0,0.62);
+  backdrop-filter: blur(6px);
+  color: white;
+  border-radius: 50%;
+}
+
+.board-pin-overlay .board-icon-btn:hover {
+  background: rgba(0,0,0,0.85);
+  color: white;
+}
+
+.board-pin-overlay .board-icon-btn--danger:hover {
+  background: var(--accent-color);
+  color: white;
+}
+
+.board-pin-overlay .board-icon-btn--active {
+  background: var(--accent-color);
+  color: white;
 }
 
 .empty-inline {
@@ -369,7 +562,7 @@ button:hover,
   color: var(--muted-color);
   background: var(--surface);
   border: 1px dashed var(--border-color);
-  border-radius: 18px;
+  border-radius: 14px;
 }
 
 .pin-dialog-backdrop,
@@ -1338,42 +1531,26 @@ html[data-theme="dark"] footer a:hover {
   }
 
   .boards-grid {
-    grid-template-columns: 1fr;
-    gap: 0.85rem;
-  }
-
-  .board-card {
-    gap: 0.85rem;
-    padding: 1rem;
-    border-radius: 22px;
-  }
-
-  .board-card-header {
-    flex-direction: column;
+    grid-template-columns: repeat(2, 1fr);
     gap: 0.75rem;
   }
 
-  .board-actions {
-    justify-content: flex-start;
-  }
-
-  .board-cover {
-    min-height: 10rem;
+  .board-card {
     border-radius: 18px;
   }
 
   .board-pin-grid {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: 0.65rem;
+    column-width: 6.5rem;
+    column-gap: 0.5rem;
   }
 
-  .board-pin-actions {
-    gap: 0.35rem;
+  .board-pin {
+    margin-bottom: 0.5rem;
   }
 
-  .board-pin-actions .compact-button {
-    padding: 0.48rem 0.56rem;
-    font-size: 0.72rem;
+  .board-pin-overlay {
+    opacity: 1;
+    pointer-events: auto;
   }
 
   .donate-container {
@@ -1412,15 +1589,8 @@ html[data-theme="dark"] footer a:hover {
     max-height: 80vh;
   }
 
-  .board-actions,
-  .board-pin-actions {
-    justify-content: flex-start;
-  }
-
   .pin-button,
-  .board-card-header .secondary-button,
-  .pin-dialog-header button,
-  .board-pin-actions .secondary-button {
+  .pin-dialog-header button {
     width: auto;
   }
 }

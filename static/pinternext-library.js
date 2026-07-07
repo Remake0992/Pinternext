@@ -201,6 +201,45 @@
     renderBoardsPage();
   };
 
+  const svgIcon = (path, label) => {
+    const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+    svg.setAttribute("viewBox", "0 0 24 24");
+    svg.setAttribute("fill", "none");
+    svg.setAttribute("stroke", "currentColor");
+    svg.setAttribute("stroke-width", "2");
+    svg.setAttribute("stroke-linecap", "round");
+    svg.setAttribute("stroke-linejoin", "round");
+    svg.setAttribute("aria-hidden", "true");
+    svg.setAttribute("width", "16");
+    svg.setAttribute("height", "16");
+    const p = document.createElementNS("http://www.w3.org/2000/svg", "path");
+    p.setAttribute("d", path);
+    svg.appendChild(p);
+    const btn = createElement("button", {
+      className: "board-icon-btn",
+      attributes: { type: "button", "aria-label": label }
+    });
+    btn.appendChild(svg);
+    return btn;
+  };
+
+  const ICON_RENAME = "M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z";
+  const ICON_DELETE = "M3 6h18M8 6V4h8v2M19 6l-1 14H6L5 6";
+  const ICON_DRAG   = "M8 6h.01M8 12h.01M8 18h.01M16 6h.01M16 12h.01M16 18h.01";
+  const ICON_COVER  = "M4 15s1-1 4-1 5 2 8 2 4-1 4-1V3s-1 1-4 1-5-2-8-2-4 1-4 1zM4 22v-7";
+  const ICON_REMOVE = "M18 6L6 18M6 6l12 12";
+  const ICON_CHEVRON_DOWN = "M6 9l6 6 6-6";
+
+  const getExpandedBoards = () => {
+    try { return new Set(JSON.parse(localStorage.getItem("pinternext-expanded-boards") || "[]")); }
+    catch { return new Set(); }
+  };
+
+  const setExpandedBoards = (set) => {
+    try { localStorage.setItem("pinternext-expanded-boards", JSON.stringify([...set])); }
+    catch {}
+  };
+
   const renderBoardsPage = () => {
     const container = document.querySelector("[data-boards-list]");
 
@@ -209,6 +248,7 @@
     }
 
     const boards = getBoards();
+    const expanded = getExpandedBoards();
     container.replaceChildren();
 
     if (boards.length === 0) {
@@ -222,36 +262,69 @@
     }
 
     boards.forEach((board) => {
+      const isExpanded = expanded.has(board.id);
       const card = createElement("article", {
-        className: "board-card",
+        className: "board-card" + (isExpanded ? " is-expanded" : ""),
         attributes: { "data-board-id": board.id }
       });
-      const coverPin = getBoardCover(board);
-      const cover = createElement("button", {
-        className: coverPin ? "board-cover" : "board-cover board-cover-empty",
-        attributes: { type: "button" }
-      });
 
-      if (coverPin) {
-        cover.style.backgroundImage = `url("${coverPin.proxyUrl}")`;
-        cover.textContent = "Open cover";
-        cover.addEventListener("click", () => openPreview(coverPin));
+      /* ── mosaic cover ── */
+      const mosaicWrap = createElement("div", { className: "board-mosaic" });
+      const pins = board.pins || [];
+      const coverPin = getBoardCover(board);
+      const mosaicPins = coverPin
+        ? [coverPin, ...pins.filter((p) => p.url !== coverPin.url).slice(0, 3)]
+        : pins.slice(0, 4);
+
+      if (mosaicPins.length === 0) {
+        const ph = createElement("div", { className: "board-mosaic-empty" });
+        ph.textContent = "No pins yet";
+        mosaicWrap.appendChild(ph);
       } else {
-        cover.textContent = "No cover yet";
-        cover.disabled = true;
+        const mainImg = createElement("div", { className: "board-mosaic-main" });
+        const mainImgEl = createElement("img", {
+          attributes: { src: mosaicPins[0].proxyUrl, alt: mosaicPins[0].title || "Cover", loading: "lazy" }
+        });
+        mainImg.appendChild(mainImgEl);
+        mosaicWrap.appendChild(mainImg);
+
+        if (mosaicPins.length > 1) {
+          const aside = createElement("div", { className: "board-mosaic-aside" });
+          mosaicPins.slice(1, 4).forEach((p) => {
+            const cell = createElement("div", { className: "board-mosaic-cell" });
+            const img = createElement("img", {
+              attributes: { src: p.proxyUrl, alt: p.title || "Pin", loading: "lazy" }
+            });
+            cell.appendChild(img);
+            aside.appendChild(cell);
+          });
+          mosaicWrap.appendChild(aside);
+        }
       }
 
-      const header = createElement("div", { className: "board-card-header" });
-      const title = createElement("div", { className: "board-title" });
-      title.append(
-        createElement("h2", { text: board.name }),
-        createElement("p", { text: `${(board.pins || []).length} pins` })
-      );
+      /* clicking the mosaic toggles expand */
+      mosaicWrap.addEventListener("click", () => {
+        const set = getExpandedBoards();
+        if (set.has(board.id)) { set.delete(board.id); card.classList.remove("is-expanded"); }
+        else { set.add(board.id); card.classList.add("is-expanded"); }
+        setExpandedBoards(set);
+        const body = card.querySelector(".board-body");
+        if (body) body.hidden = !card.classList.contains("is-expanded");
+        const chevron = card.querySelector(".board-chevron");
+        if (chevron) chevron.classList.toggle("is-open", card.classList.contains("is-expanded"));
+      });
 
-      const actions = createElement("div", { className: "board-actions" });
+      /* ── collapsed header row ── */
+      const meta = createElement("div", { className: "board-meta" });
+      const metaLeft = createElement("div", { className: "board-meta-left" });
+      const nameEl = createElement("span", { className: "board-name", text: board.name });
+      const countEl = createElement("span", { className: "board-count", text: `${pins.length} pin${pins.length !== 1 ? "s" : ""}` });
+      metaLeft.append(nameEl, countEl);
+
+      const metaRight = createElement("div", { className: "board-meta-right" });
+
       const dragHandle = createElement("button", {
-        className: "secondary-button compact-button drag-handle",
-        text: "Drag",
+        className: "board-icon-btn drag-handle",
         attributes: {
           type: "button",
           draggable: "true",
@@ -259,27 +332,47 @@
           "data-board-drag-handle": board.id
         }
       });
-      const renameButton = createElement("button", {
-        className: "secondary-button compact-button",
-        text: "Rename",
-        attributes: { type: "button" }
+      const dragSvg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+      dragSvg.setAttribute("viewBox", "0 0 24 24"); dragSvg.setAttribute("fill", "none");
+      dragSvg.setAttribute("stroke", "currentColor"); dragSvg.setAttribute("stroke-width", "2");
+      dragSvg.setAttribute("stroke-linecap", "round"); dragSvg.setAttribute("stroke-linejoin", "round");
+      dragSvg.setAttribute("aria-hidden", "true"); dragSvg.setAttribute("width", "16"); dragSvg.setAttribute("height", "16");
+      [ICON_DRAG].forEach((d) => { const p = document.createElementNS("http://www.w3.org/2000/svg", "path"); p.setAttribute("d", d); dragSvg.appendChild(p); });
+      dragHandle.appendChild(dragSvg);
+
+      const renameButton = svgIcon(ICON_RENAME, `Rename ${board.name}`);
+      renameButton.classList.add("board-icon-btn");
+      const deleteButton = svgIcon(ICON_DELETE, `Delete ${board.name}`);
+      deleteButton.classList.add("board-icon-btn", "board-icon-btn--danger");
+
+      const chevronBtn = createElement("button", {
+        className: "board-icon-btn board-chevron" + (isExpanded ? " is-open" : ""),
+        attributes: { type: "button", "aria-label": isExpanded ? "Collapse board" : "Expand board" }
       });
-      const deleteButton = createElement("button", {
-        className: "secondary-button compact-button",
-        text: "Delete",
-        attributes: { type: "button" }
+      const chevSvg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+      chevSvg.setAttribute("viewBox", "0 0 24 24"); chevSvg.setAttribute("fill", "none");
+      chevSvg.setAttribute("stroke", "currentColor"); chevSvg.setAttribute("stroke-width", "2.5");
+      chevSvg.setAttribute("stroke-linecap", "round"); chevSvg.setAttribute("stroke-linejoin", "round");
+      chevSvg.setAttribute("aria-hidden", "true"); chevSvg.setAttribute("width", "16"); chevSvg.setAttribute("height", "16");
+      const chevPath = document.createElementNS("http://www.w3.org/2000/svg", "path");
+      chevPath.setAttribute("d", ICON_CHEVRON_DOWN); chevSvg.appendChild(chevPath);
+      chevronBtn.appendChild(chevSvg);
+      chevronBtn.addEventListener("click", (e) => {
+        e.stopPropagation();
+        mosaicWrap.click();
       });
+
+      metaRight.append(dragHandle, renameButton, deleteButton, chevronBtn);
+      meta.append(metaLeft, metaRight);
+
+      /* ── rename form ── */
       const renameForm = createElement("form", { className: "board-rename-form", attributes: { hidden: "" } });
       const renameInput = createElement("input", {
-        attributes: {
-          type: "text",
-          value: board.name,
-          maxlength: "48",
-          "aria-label": `Rename ${board.name}`
-        }
+        attributes: { type: "text", value: board.name, maxlength: "48", "aria-label": `Rename ${board.name}` }
       });
       const renameSubmit = createElement("button", { text: "Save", attributes: { type: "submit" } });
 
+      /* ── drag / drop for board reorder ── */
       dragHandle.addEventListener("dragstart", (event) => {
         event.dataTransfer.effectAllowed = "move";
         setDragPayload(event, { type: "board", boardId: board.id });
@@ -290,38 +383,33 @@
       card.addEventListener("drop", (event) => {
         event.preventDefault();
         const payload = readDragPayload(event);
-
-        if (payload?.type === "board") {
-          reorderBoards(payload.boardId, board.id);
-        }
+        if (payload?.type === "board") { reorderBoards(payload.boardId, board.id); }
       });
 
-      renameButton.addEventListener("click", () => {
+      renameButton.addEventListener("click", (e) => {
+        e.stopPropagation();
         renameForm.hidden = !renameForm.hidden;
-        if (!renameForm.hidden) {
-          renameInput.focus();
-          renameInput.select();
-        }
+        if (!renameForm.hidden) { renameInput.focus(); renameInput.select(); }
       });
       renameForm.addEventListener("submit", (event) => {
         event.preventDefault();
         renameBoard(board.id, renameInput.value);
       });
-      deleteButton.addEventListener("click", () => deleteBoard(board.id));
+      deleteButton.addEventListener("click", (e) => { e.stopPropagation(); deleteBoard(board.id); });
       renameForm.append(renameInput, renameSubmit);
-      actions.append(dragHandle, renameButton, deleteButton);
-      header.append(title, actions);
 
+      /* ── expandable pin grid body ── */
+      const body = createElement("div", { className: "board-body", attributes: isExpanded ? {} : { hidden: "" } });
       const pinGrid = createElement("div", { className: "board-pin-grid" });
 
-      if ((board.pins || []).length === 0) {
+      if (pins.length === 0) {
         pinGrid.appendChild(createElement("p", {
           className: "empty-inline",
           text: "This board is empty. Search for ideas and hit Pin."
         }));
       }
 
-      (board.pins || []).forEach((pin) => {
+      pins.forEach((pin) => {
         const item = createElement("div", {
           className: "board-pin",
           attributes: {
@@ -334,38 +422,30 @@
         });
         const link = createElement("a", {
           className: "pin-open-link",
-          attributes: {
-            href: pin.proxyUrl,
-            rel: "noopener noreferrer"
-          }
+          attributes: { href: pin.proxyUrl, rel: "noopener noreferrer" }
         });
         const image = createElement("img", {
-          attributes: {
-            src: pin.proxyUrl,
-            alt: pin.title || "Saved pin",
-            loading: "lazy"
-          }
+          attributes: { src: pin.proxyUrl, alt: pin.title || "Saved pin", loading: "lazy" }
         });
-        const pinActions = createElement("div", { className: "board-pin-actions" });
+
+        /* overlay action buttons */
+        const overlay = createElement("div", { className: "board-pin-overlay" });
         const pinDragHandle = createElement("button", {
-          className: "secondary-button compact-button drag-handle",
-          text: "Drag",
-          attributes: {
-            type: "button",
-            draggable: "true",
-            "aria-label": `Drag ${pin.title || "saved pin"}`
-          }
+          className: "board-icon-btn drag-handle",
+          attributes: { type: "button", draggable: "true", "aria-label": `Drag ${pin.title || "saved pin"}` }
         });
-        const setCover = createElement("button", {
-          className: "secondary-button compact-button",
-          text: board.coverUrl === pin.url ? "Cover" : "Set cover",
-          attributes: { type: "button" }
-        });
-        const remove = createElement("button", {
-          className: "secondary-button compact-button",
-          text: "Remove",
-          attributes: { type: "button" }
-        });
+        const dSvg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+        dSvg.setAttribute("viewBox", "0 0 24 24"); dSvg.setAttribute("fill", "none");
+        dSvg.setAttribute("stroke", "currentColor"); dSvg.setAttribute("stroke-width", "2");
+        dSvg.setAttribute("stroke-linecap", "round"); dSvg.setAttribute("stroke-linejoin", "round");
+        dSvg.setAttribute("aria-hidden", "true"); dSvg.setAttribute("width", "14"); dSvg.setAttribute("height", "14");
+        const dp = document.createElementNS("http://www.w3.org/2000/svg", "path"); dp.setAttribute("d", ICON_DRAG); dSvg.appendChild(dp);
+        pinDragHandle.appendChild(dSvg);
+
+        const setCover = svgIcon(ICON_COVER, board.coverUrl === pin.url ? "Current cover" : "Set as cover");
+        if (board.coverUrl === pin.url) setCover.classList.add("board-icon-btn--active");
+        const remove = svgIcon(ICON_REMOVE, "Remove pin");
+        remove.classList.add("board-icon-btn--danger");
 
         pinDragHandle.addEventListener("dragstart", (event) => {
           event.dataTransfer.effectAllowed = "move";
@@ -377,20 +457,20 @@
         item.addEventListener("drop", (event) => {
           event.preventDefault();
           const payload = readDragPayload(event);
-
           if (payload?.type === "pin" && payload.boardId === board.id) {
             reorderPins(board.id, payload.pinUrl, pin.url);
           }
         });
-        setCover.addEventListener("click", () => setBoardCover(board.id, pin));
-        remove.addEventListener("click", () => removePinFromBoard(board.id, pin.url));
+        setCover.addEventListener("click", (e) => { e.preventDefault(); setBoardCover(board.id, pin); });
+        remove.addEventListener("click", (e) => { e.preventDefault(); removePinFromBoard(board.id, pin.url); });
         link.appendChild(image);
-        pinActions.append(pinDragHandle, setCover, remove);
-        item.append(link, pinActions);
+        overlay.append(pinDragHandle, setCover, remove);
+        item.append(link, overlay);
         pinGrid.appendChild(item);
       });
 
-      card.append(cover, header, renameForm, pinGrid);
+      body.appendChild(pinGrid);
+      card.append(mosaicWrap, meta, renameForm, body);
       container.appendChild(card);
     });
   };
