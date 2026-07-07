@@ -239,18 +239,18 @@ button:hover,
   min-width: 0;
 }
 
-/* ── Pinterest-style grid ───────────────────────────────────────── */
+/* ── Pinterest-style masonry grid ──────────────────────────────── */
 
 .boards-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
-  gap: 1.25rem;
+  column-count: auto;
+  column-width: 240px;
+  column-gap: 1.25rem;
   width: 100%;
   margin: 0 auto;
 }
 
 .boards-grid .empty-state {
-  grid-column: 1 / -1;
+  column-span: all;
   width: 100%;
   margin: 0;
 }
@@ -261,12 +261,14 @@ button:hover,
   display: flex;
   flex-direction: column;
   gap: 0;
+  break-inside: avoid;
   background: var(--surface);
   border: 1px solid var(--border-color);
   border-radius: 20px;
   overflow: hidden;
   box-shadow: 0 2px 12px rgba(0,0,0,0.12);
   transition: box-shadow 200ms ease, transform 200ms ease;
+  margin-bottom: 1.25rem;
 }
 
 .board-card:hover {
@@ -288,17 +290,19 @@ button:hover,
   display: grid;
   grid-template-columns: 2fr 1fr;
   grid-template-rows: 1fr;
-  aspect-ratio: 1.45 / 1;
   cursor: pointer;
   overflow: hidden;
   background: var(--surface-strong);
   flex-shrink: 0;
+  /* no forced aspect-ratio — let the main image drive the height naturally */
 }
 
 .board-mosaic-main {
   grid-column: 1;
   grid-row: 1;
   overflow: hidden;
+  /* stretch to fill whatever height the aside occupies */
+  align-self: stretch;
 }
 
 .board-mosaic-main img {
@@ -307,6 +311,8 @@ button:hover,
   object-fit: cover;
   display: block;
   transition: transform 240ms ease;
+  /* keep a sensible min so single-image boards don't collapse */
+  min-height: 120px;
 }
 
 .board-mosaic:hover .board-mosaic-main img {
@@ -320,10 +326,13 @@ button:hover,
   grid-template-rows: repeat(3, 1fr);
   gap: 2px;
   padding-left: 2px;
+  align-self: stretch;
 }
 
 .board-mosaic-cell {
   overflow: hidden;
+  /* give each side-cell a natural minimum so they aren't paper-thin */
+  min-height: 52px;
 }
 
 .board-mosaic-cell img {
@@ -344,7 +353,7 @@ button:hover,
   place-items: center;
   color: var(--muted-color);
   font-size: 0.9rem;
-  height: 100%;
+  min-height: 120px;
 }
 
 /* ── Board meta row (always visible) ───────────────────────────── */
@@ -1531,12 +1540,14 @@ html[data-theme="dark"] footer a:hover {
   }
 
   .boards-grid {
-    grid-template-columns: repeat(2, 1fr);
-    gap: 0.75rem;
+    column-count: 2;
+    column-width: auto;
+    column-gap: 0.75rem;
   }
 
   .board-card {
     border-radius: 18px;
+    margin-bottom: 0.75rem;
   }
 
   .board-pin-grid {
