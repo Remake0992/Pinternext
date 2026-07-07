@@ -61,12 +61,14 @@
     }
 
     renderFeed();
+    document.dispatchEvent(new CustomEvent("pinternext:feed-updated"));
     return true;
   };
 
   const removeFeedPhrase = (phrase) => {
     saveFeed(getFeed().filter((item) => item !== phrase));
     renderFeed();
+    document.dispatchEvent(new CustomEvent("pinternext:feed-updated"));
   };
 
   const fetchFeedImages = async (phrase, bookmark = null) => {
