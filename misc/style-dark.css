@@ -239,18 +239,18 @@ button:hover,
   min-width: 0;
 }
 
-/* ── Pinterest-style masonry grid ──────────────────────────────── */
+/* ── Board tile grid ───────────────────────────────────────────── */
 
 .boards-grid {
-  column-count: auto;
-  column-width: 240px;
-  column-gap: 1.25rem;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: 1.25rem;
   width: 100%;
-  margin: 0 auto;
+  align-items: start;
 }
 
 .boards-grid .empty-state {
-  column-span: all;
+  grid-column: 1 / -1;
   width: 100%;
   margin: 0;
 }
@@ -261,19 +261,22 @@ button:hover,
   display: flex;
   flex-direction: column;
   gap: 0;
-  break-inside: avoid;
   background: var(--surface);
   border: 1px solid var(--border-color);
   border-radius: 20px;
   overflow: hidden;
   box-shadow: 0 2px 12px rgba(0,0,0,0.12);
   transition: box-shadow 200ms ease, transform 200ms ease;
-  margin-bottom: 1.25rem;
 }
 
-.board-card:hover {
+/* When expanded the card fills the whole grid row */
+.board-card.is-expanded {
+  grid-column: 1 / -1;
+}
+
+.board-card:not(.is-expanded):hover {
   box-shadow: 0 8px 30px rgba(0,0,0,0.22);
-  transform: translateY(-2px);
+  transform: translateY(-3px);
 }
 
 .board-card.is-dragging {
@@ -284,76 +287,51 @@ button:hover,
   opacity: 0.45;
 }
 
-/* ── Mosaic cover ───────────────────────────────────────────────── */
+/* ── Square cover tile ──────────────────────────────────────────── */
 
-.board-mosaic {
-  display: grid;
-  grid-template-columns: 2fr 1fr;
-  grid-template-rows: 1fr;
-  cursor: pointer;
+.board-cover {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 1 / 1;
   overflow: hidden;
   background: var(--surface-strong);
+  cursor: pointer;
   flex-shrink: 0;
-  /* no forced aspect-ratio — let the main image drive the height naturally */
 }
 
-.board-mosaic-main {
-  grid-column: 1;
-  grid-row: 1;
-  overflow: hidden;
-  /* stretch to fill whatever height the aside occupies */
-  align-self: stretch;
-}
-
-.board-mosaic-main img {
+.board-cover img {
   width: 100%;
   height: 100%;
   object-fit: cover;
   display: block;
-  transition: transform 240ms ease;
-  /* keep a sensible min so single-image boards don't collapse */
-  min-height: 120px;
+  transition: transform 280ms ease;
 }
 
-.board-mosaic:hover .board-mosaic-main img {
-  transform: scale(1.04);
-}
-
-.board-mosaic-aside {
-  grid-column: 2;
-  grid-row: 1;
-  display: grid;
-  grid-template-rows: repeat(3, 1fr);
-  gap: 2px;
-  padding-left: 2px;
-  align-self: stretch;
-}
-
-.board-mosaic-cell {
-  overflow: hidden;
-  /* give each side-cell a natural minimum so they aren't paper-thin */
-  min-height: 52px;
-}
-
-.board-mosaic-cell img {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-  display: block;
-  transition: transform 240ms ease;
-}
-
-.board-mosaic:hover .board-mosaic-cell img {
+.board-card:not(.is-expanded) .board-cover:hover img {
   transform: scale(1.06);
 }
 
-.board-mosaic-empty {
-  grid-column: 1 / -1;
+/* subtle darkening overlay on hover to hint at interactivity */
+.board-cover::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: rgba(0, 0, 0, 0);
+  transition: background 200ms ease;
+  pointer-events: none;
+}
+
+.board-card:not(.is-expanded) .board-cover:hover::after {
+  background: rgba(0, 0, 0, 0.18);
+}
+
+.board-cover-empty {
   display: grid;
   place-items: center;
+  width: 100%;
+  height: 100%;
   color: var(--muted-color);
-  font-size: 0.9rem;
-  min-height: 120px;
+  font-size: 0.88rem;
 }
 
 /* ── Board meta row (always visible) ───────────────────────────── */
@@ -1540,14 +1518,12 @@ html[data-theme="dark"] footer a:hover {
   }
 
   .boards-grid {
-    column-count: 2;
-    column-width: auto;
-    column-gap: 0.75rem;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 0.75rem;
   }
 
   .board-card {
     border-radius: 18px;
-    margin-bottom: 0.75rem;
   }
 
   .board-pin-grid {

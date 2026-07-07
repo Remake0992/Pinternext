@@ -230,15 +230,9 @@
   const ICON_REMOVE = "M18 6L6 18M6 6l12 12";
   const ICON_CHEVRON_DOWN = "M6 9l6 6 6-6";
 
-  const getExpandedBoards = () => {
-    try { return new Set(JSON.parse(localStorage.getItem("pinternext-expanded-boards") || "[]")); }
-    catch { return new Set(); }
-  };
-
-  const setExpandedBoards = (set) => {
-    try { localStorage.setItem("pinternext-expanded-boards", JSON.stringify([...set])); }
-    catch {}
-  };
+  /* Boards are collapsed by default — expanded state is tracked only in memory
+     for the current page session, so they always start collapsed on (re)load. */
+  const expandedBoards = new Set();
 
   const renderBoardsPage = () => {
     const container = document.querySelector("[data-boards-list]");
@@ -248,7 +242,7 @@
     }
 
     const boards = getBoards();
-    const expanded = getExpandedBoards();
+    const expanded = expandedBoards;
     container.replaceChildren();
 
     if (boards.length === 0) {
@@ -268,51 +262,39 @@
         attributes: { "data-board-id": board.id }
       });
 
-      /* ── mosaic cover ── */
-      const mosaicWrap = createElement("div", { className: "board-mosaic" });
+      /* ── square cover tile ── */
       const pins = board.pins || [];
       const coverPin = getBoardCover(board);
-      const mosaicPins = coverPin
-        ? [coverPin, ...pins.filter((p) => p.url !== coverPin.url).slice(0, 3)]
-        : pins.slice(0, 4);
 
-      if (mosaicPins.length === 0) {
-        const ph = createElement("div", { className: "board-mosaic-empty" });
+      const coverWrap = createElement("div", { className: "board-cover" });
+
+      if (!coverPin) {
+        const ph = createElement("div", { className: "board-cover-empty" });
         ph.textContent = "No pins yet";
-        mosaicWrap.appendChild(ph);
+        coverWrap.appendChild(ph);
       } else {
-        const mainImg = createElement("div", { className: "board-mosaic-main" });
-        const mainImgEl = createElement("img", {
-          attributes: { src: mosaicPins[0].proxyUrl, alt: mosaicPins[0].title || "Cover", loading: "lazy" }
+        const coverImg = createElement("img", {
+          attributes: { src: coverPin.proxyUrl, alt: coverPin.title || "Board cover", loading: "lazy" }
         });
-        mainImg.appendChild(mainImgEl);
-        mosaicWrap.appendChild(mainImg);
-
-        if (mosaicPins.length > 1) {
-          const aside = createElement("div", { className: "board-mosaic-aside" });
-          mosaicPins.slice(1, 4).forEach((p) => {
-            const cell = createElement("div", { className: "board-mosaic-cell" });
-            const img = createElement("img", {
-              attributes: { src: p.proxyUrl, alt: p.title || "Pin", loading: "lazy" }
-            });
-            cell.appendChild(img);
-            aside.appendChild(cell);
-          });
-          mosaicWrap.appendChild(aside);
-        }
+        coverWrap.appendChild(coverImg);
       }
 
-      /* clicking the mosaic toggles expand */
-      mosaicWrap.addEventListener("click", () => {
-        const set = getExpandedBoards();
-        if (set.has(board.id)) { set.delete(board.id); card.classList.remove("is-expanded"); }
-        else { set.add(board.id); card.classList.add("is-expanded"); }
-        setExpandedBoards(set);
+      /* clicking the cover (or anywhere on the card header) toggles expand */
+      const toggleExpand = () => {
+        if (expandedBoards.has(board.id)) {
+          expandedBoards.delete(board.id);
+          card.classList.remove("is-expanded");
+        } else {
+          expandedBoards.add(board.id);
+          card.classList.add("is-expanded");
+        }
         const body = card.querySelector(".board-body");
         if (body) body.hidden = !card.classList.contains("is-expanded");
         const chevron = card.querySelector(".board-chevron");
         if (chevron) chevron.classList.toggle("is-open", card.classList.contains("is-expanded"));
-      });
+      };
+
+      coverWrap.addEventListener("click", toggleExpand);
 
       /* ── collapsed header row ── */
       const meta = createElement("div", { className: "board-meta" });
@@ -359,7 +341,7 @@
       chevronBtn.appendChild(chevSvg);
       chevronBtn.addEventListener("click", (e) => {
         e.stopPropagation();
-        mosaicWrap.click();
+        toggleExpand();
       });
 
       metaRight.append(dragHandle, renameButton, deleteButton, chevronBtn);
@@ -470,7 +452,7 @@
       });
 
       body.appendChild(pinGrid);
-      card.append(mosaicWrap, meta, renameForm, body);
+      card.append(coverWrap, meta, renameForm, body);
       container.appendChild(card);
     });
   };
