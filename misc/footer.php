@@ -1,5 +1,12 @@
 <nav class="site-actions" aria-label="Site actions">
-  <a class="top-action-link" href="./boards.php">Boards</a>
+<?php
+  $current_page = basename($_SERVER['PHP_SELF']);
+  if ($current_page === 'boards.php') {
+    echo '<a class="top-action-link" href="./">Search</a>';
+  } else {
+    echo '<a class="top-action-link" href="./boards.php">Boards</a>';
+  }
+?>
   <button class="theme-toggle" type="button" data-theme-toggle aria-label="Switch color theme">☾</button>
 </nav>
 <footer>
