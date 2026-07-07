@@ -105,11 +105,54 @@
     return { images, nextBookmark };
   };
 
+  const renderQuickFeedList = (container, feed) => {
+    container.replaceChildren();
+
+    if (feed.length === 0) {
+      container.appendChild(createElement("p", {
+        className: "empty-inline",
+        text: "No saved feeds yet. Search a phrase, then save it for quick access."
+      }));
+      return;
+    }
+
+    const list = createElement("div", { className: "quick-feed-list" });
+
+    feed.forEach((phrase) => {
+      const item = createElement("article", { className: "quick-feed-card" });
+      const link = createElement("a", {
+        className: "quick-feed-link",
+        text: phrase,
+        attributes: { href: `search.php?q=${encodeURIComponent(phrase)}` }
+      });
+      const remove = createElement("button", {
+        className: "feed-remove-button quick-feed-remove",
+        text: "×",
+        attributes: {
+          type: "button",
+          "aria-label": `Remove ${phrase} from saved feeds`
+        }
+      });
+
+      remove.addEventListener("click", () => removeFeedPhrase(phrase));
+      item.append(link, remove);
+      list.appendChild(item);
+    });
+
+    container.appendChild(list);
+  };
+
   const renderFeed = () => {
     document.querySelectorAll("[data-feed-list]").forEach((container) => {
       const feed = getFeed();
       const requestId = createId();
       container.dataset.feedRequest = requestId;
+
+      if (container.dataset.feedList === "quick") {
+        renderQuickFeedList(container, feed);
+        return;
+      }
+
       container.replaceChildren();
 
       if (feed.length === 0) {
