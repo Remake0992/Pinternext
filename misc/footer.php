@@ -1,5 +1,10 @@
+<?php
+$current_page = basename($_SERVER['PHP_SELF'] ?? '');
+$action_href = $current_page === 'boards.php' ? './' : './boards.php';
+$action_label = $current_page === 'boards.php' ? 'Search' : 'Boards';
+?>
 <nav class="site-actions" aria-label="Site actions">
-  <a class="top-action-link" href="./boards.php">Boards</a>
+  <a class="top-action-link" href="<?php echo $action_href; ?>"><?php echo $action_label; ?></a>
   <button class="theme-toggle" type="button" data-theme-toggle aria-label="Switch color theme">☾</button>
 </nav>
 <footer>

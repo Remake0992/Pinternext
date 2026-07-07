@@ -6,7 +6,7 @@
         <section class="boards-hero" aria-labelledby="boards-title">
             <a class="no-decoration accent logo-wordmark" href="./"><span class="logo-dot">P</span>internext</a>
             <h1 id="boards-title">Your boards</h1>
-            <p>Create Pinterest-style boards, rename and reorder them, choose covers, and drag pins into your preferred order. Boards are stored privately in this browser.</p>
+            <p>Create Pinterest-style boards, then open any board to scroll the pins saved inside. Board cards show a small preview collage and stay the same size until opened. Boards are stored privately in this browser.</p>
 
             <form class="board-create-form" data-board-create-form autocomplete="off">
                 <input type="text" name="boardName" placeholder="New board name" required maxlength="48" data-board-name-input>

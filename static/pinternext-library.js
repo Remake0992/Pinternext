@@ -456,31 +456,41 @@
     return true;
   };
 
-  const setBoardCover = (boardId, pin) => {
-    const boards = getBoards();
-    const board = boards.find((item) => item.id === boardId);
-
-    if (!board) {
-      return;
-    }
-
-    board.coverUrl = pin.url;
-    board.coverProxyUrl = pin.proxyUrl;
-    saveBoards(boards);
-    renderBoardsPage();
-  };
-
-  const getBoardCover = (board) => {
-    const pins = board.pins || [];
-    const selectedPin = board.coverUrl ? pins.find((pin) => pin.url === board.coverUrl) : null;
-    return selectedPin || pins[0] || null;
-  };
-
   const moveItem = (items, fromIndex, toIndex) => {
     const next = [...items];
     const [item] = next.splice(fromIndex, 1);
     next.splice(toIndex, 0, item);
     return next;
+  };
+
+  const getOpenBoardId = () => {
+    const hash = window.location.hash || "";
+
+    if (!hash.startsWith("#board-")) {
+      return null;
+    }
+
+    try {
+      return decodeURIComponent(hash.slice(7));
+    } catch (error) {
+      return null;
+    }
+  };
+
+  const openBoard = (boardId) => {
+    const nextHash = `#board-${encodeURIComponent(boardId)}`;
+
+    if (window.location.hash === nextHash) {
+      renderBoardsPage();
+      return;
+    }
+
+    window.location.hash = nextHash;
+  };
+
+  const closeBoard = () => {
+    window.history.pushState("", document.title, window.location.pathname + window.location.search);
+    renderBoardsPage();
   };
 
   const reorderBoards = (draggedBoardId, targetBoardId) => {
@@ -525,6 +535,181 @@
     renderBoardsPage();
   };
 
+  const createBoardPinItem = (board, pin) => {
+    const item = createElement("div", {
+      className: "board-pin board-pin-open",
+      attributes: {
+        "data-image-url": pin.url,
+        "data-proxy-url": pin.proxyUrl || pin.url,
+        "data-pin-title": pin.title || "Saved pin",
+        "data-board-id": board.id,
+        "data-pin-url": pin.url
+      }
+    });
+    const link = createElement("a", {
+      className: "pin-open-link",
+      attributes: {
+        href: pin.proxyUrl || pin.url,
+        rel: "noopener noreferrer"
+      }
+    });
+    const image = createElement("img", {
+      attributes: {
+        src: pin.proxyUrl || pin.url,
+        alt: pin.title || "Saved pin",
+        loading: "lazy",
+        decoding: "async"
+      }
+    });
+    const pinActions = createElement("div", { className: "board-pin-actions" });
+    const pinDragHandle = createElement("button", {
+      className: "secondary-button compact-button drag-handle",
+      text: "Drag",
+      attributes: {
+        type: "button",
+        draggable: "true",
+        "aria-label": `Drag ${pin.title || "saved pin"}`
+      }
+    });
+    const remove = createElement("button", {
+      className: "secondary-button compact-button",
+      text: "Remove",
+      attributes: { type: "button" }
+    });
+
+    pinDragHandle.addEventListener("dragstart", (event) => {
+      event.dataTransfer.effectAllowed = "move";
+      setDragPayload(event, { type: "pin", boardId: board.id, pinUrl: pin.url });
+      item.classList.add("is-dragging");
+    });
+    pinDragHandle.addEventListener("dragend", () => item.classList.remove("is-dragging"));
+    item.addEventListener("dragover", (event) => event.preventDefault());
+    item.addEventListener("drop", (event) => {
+      event.preventDefault();
+      const payload = readDragPayload(event);
+
+      if (payload?.type === "pin" && payload.boardId === board.id) {
+        reorderPins(board.id, payload.pinUrl, pin.url);
+      }
+    });
+    remove.addEventListener("click", () => removePinFromBoard(board.id, pin.url));
+    link.appendChild(image);
+    pinActions.append(pinDragHandle, remove);
+    item.append(link, pinActions);
+    return item;
+  };
+
+  const createBoardCollage = (board) => {
+    const previewPins = (board.pins || []).slice(0, 4);
+    const collage = createElement("div", {
+      className: `board-collage count-${previewPins.length}`,
+      attributes: { "aria-hidden": "true" }
+    });
+
+    if (previewPins.length === 0) {
+      collage.appendChild(createElement("span", {
+        className: "board-collage-empty",
+        text: "No pins yet"
+      }));
+      return collage;
+    }
+
+    previewPins.forEach((pin) => {
+      collage.appendChild(createElement("img", {
+        attributes: {
+          src: pin.proxyUrl || pin.url,
+          alt: "",
+          loading: "lazy",
+          decoding: "async"
+        }
+      }));
+    });
+
+    return collage;
+  };
+
+  const createBoardRenameForm = (board) => {
+    const renameForm = createElement("form", { className: "board-rename-form", attributes: { hidden: "" } });
+    const renameInput = createElement("input", {
+      attributes: {
+        type: "text",
+        value: board.name,
+        maxlength: "48",
+        "aria-label": `Rename ${board.name}`
+      }
+    });
+    const renameSubmit = createElement("button", { text: "Save", attributes: { type: "submit" } });
+
+    renameForm.addEventListener("submit", (event) => {
+      event.preventDefault();
+      renameBoard(board.id, renameInput.value);
+    });
+    renameForm.append(renameInput, renameSubmit);
+
+    return { renameForm, renameInput };
+  };
+
+  const renderOpenBoard = (container, board) => {
+    container.classList.add("is-board-open");
+
+    const panel = createElement("article", {
+      className: "board-detail-panel",
+      attributes: { "data-board-id": board.id }
+    });
+    const back = createElement("button", {
+      className: "secondary-button compact-button board-back-button",
+      text: "All boards",
+      attributes: { type: "button" }
+    });
+    const header = createElement("div", { className: "board-detail-header" });
+    const title = createElement("div", { className: "board-title" });
+    const actions = createElement("div", { className: "board-actions" });
+    const renameButton = createElement("button", {
+      className: "secondary-button compact-button",
+      text: "Rename",
+      attributes: { type: "button" }
+    });
+    const deleteButton = createElement("button", {
+      className: "secondary-button compact-button",
+      text: "Delete board",
+      attributes: { type: "button" }
+    });
+    const { renameForm, renameInput } = createBoardRenameForm(board);
+    const masonry = createElement("div", { className: "board-open-masonry" });
+
+    back.addEventListener("click", closeBoard);
+    title.append(
+      createElement("h2", { text: board.name }),
+      createElement("p", { text: `${(board.pins || []).length} pins` })
+    );
+    renameButton.addEventListener("click", () => {
+      renameForm.hidden = !renameForm.hidden;
+      if (!renameForm.hidden) {
+        renameInput.focus();
+        renameInput.select();
+      }
+    });
+    deleteButton.addEventListener("click", () => {
+      closeBoard();
+      deleteBoard(board.id);
+    });
+
+    actions.append(renameButton, deleteButton);
+    header.append(title, actions);
+
+    if ((board.pins || []).length === 0) {
+      masonry.appendChild(createElement("p", {
+        className: "empty-inline",
+        text: "This board is empty. Search for ideas and hit Pin."
+      }));
+    } else {
+      (board.pins || []).forEach((pin) => masonry.appendChild(createBoardPinItem(board, pin)));
+    }
+
+    panel.append(back, header, renameForm, masonry);
+    container.appendChild(panel);
+  };
+
   const renderBoardsPage = () => {
     const container = document.querySelector("[data-boards-list]");
 
@@ -533,6 +718,10 @@
     }
 
     const boards = getBoards();
+    const openBoardId = getOpenBoardId();
+    const selectedBoard = openBoardId ? boards.find((board) => board.id === openBoardId) : null;
+
+    container.classList.remove("is-board-open");
     container.replaceChildren();
 
     if (boards.length === 0) {
@@ -545,33 +734,28 @@
       return;
     }
 
+    if (openBoardId && selectedBoard) {
+      renderOpenBoard(container, selectedBoard);
+      return;
+    }
+
+    if (openBoardId && !selectedBoard) {
+      window.history.replaceState("", document.title, window.location.pathname + window.location.search);
+    }
+
     boards.forEach((board) => {
+      const pins = board.pins || [];
       const card = createElement("article", {
-        className: "board-card",
-        attributes: { "data-board-id": board.id }
+        className: "board-card board-summary-card",
+        attributes: {
+          "data-board-id": board.id,
+          role: "button",
+          tabindex: "0",
+          "aria-label": `Open ${board.name} board with ${pins.length} pins`
+        }
       });
-      const coverPin = getBoardCover(board);
-      const cover = createElement("button", {
-        className: coverPin ? "board-cover" : "board-cover board-cover-empty",
-        attributes: { type: "button" }
-      });
-
-      if (coverPin) {
-        cover.style.backgroundImage = `url("${coverPin.proxyUrl}")`;
-        cover.textContent = "Open cover";
-        cover.addEventListener("click", () => openPreview(coverPin));
-      } else {
-        cover.textContent = "No cover yet";
-        cover.disabled = true;
-      }
-
       const header = createElement("div", { className: "board-card-header" });
       const title = createElement("div", { className: "board-title" });
-      title.append(
-        createElement("h2", { text: board.name }),
-        createElement("p", { text: `${(board.pins || []).length} pins` })
-      );
-
       const actions = createElement("div", { className: "board-actions" });
       const dragHandle = createElement("button", {
         className: "secondary-button compact-button drag-handle",
@@ -593,16 +777,12 @@
         text: "Delete",
         attributes: { type: "button" }
       });
-      const renameForm = createElement("form", { className: "board-rename-form", attributes: { hidden: "" } });
-      const renameInput = createElement("input", {
-        attributes: {
-          type: "text",
-          value: board.name,
-          maxlength: "48",
-          "aria-label": `Rename ${board.name}`
-        }
-      });
-      const renameSubmit = createElement("button", { text: "Save", attributes: { type: "submit" } });
+      const { renameForm, renameInput } = createBoardRenameForm(board);
+
+      title.append(
+        createElement("h2", { text: board.name }),
+        createElement("p", { text: `${pins.length} pins` })
+      );
 
       dragHandle.addEventListener("dragstart", (event) => {
         event.dataTransfer.effectAllowed = "move";
@@ -619,6 +799,21 @@
           reorderBoards(payload.boardId, board.id);
         }
       });
+      card.addEventListener("click", (event) => {
+        if (event.target.closest("a, button, input, form")) {
+          return;
+        }
+        openBoard(board.id);
+      });
+      card.addEventListener("keydown", (event) => {
+        if (event.target.closest("a, button, input, form")) {
+          return;
+        }
+        if (event.key === "Enter" || event.key === " ") {
+          event.preventDefault();
+          openBoard(board.id);
+        }
+      });
 
       renameButton.addEventListener("click", () => {
         renameForm.hidden = !renameForm.hidden;
@@ -627,94 +822,11 @@
           renameInput.select();
         }
       });
-      renameForm.addEventListener("submit", (event) => {
-        event.preventDefault();
-        renameBoard(board.id, renameInput.value);
-      });
       deleteButton.addEventListener("click", () => deleteBoard(board.id));
-      renameForm.append(renameInput, renameSubmit);
       actions.append(dragHandle, renameButton, deleteButton);
       header.append(title, actions);
 
-      const pinGrid = createElement("div", { className: "board-pin-grid" });
-
-      if ((board.pins || []).length === 0) {
-        pinGrid.appendChild(createElement("p", {
-          className: "empty-inline",
-          text: "This board is empty. Search for ideas and hit Pin."
-        }));
-      }
-
-      (board.pins || []).forEach((pin) => {
-        const item = createElement("div", {
-          className: "board-pin",
-          attributes: {
-            "data-image-url": pin.url,
-            "data-proxy-url": pin.proxyUrl,
-            "data-pin-title": pin.title || "Saved pin",
-            "data-board-id": board.id,
-            "data-pin-url": pin.url
-          }
-        });
-        const link = createElement("a", {
-          className: "pin-open-link",
-          attributes: {
-            href: pin.proxyUrl,
-            rel: "noopener noreferrer"
-          }
-        });
-        const image = createElement("img", {
-          attributes: {
-            src: pin.proxyUrl,
-            alt: pin.title || "Saved pin",
-            loading: "lazy"
-          }
-        });
-        const pinActions = createElement("div", { className: "board-pin-actions" });
-        const pinDragHandle = createElement("button", {
-          className: "secondary-button compact-button drag-handle",
-          text: "Drag",
-          attributes: {
-            type: "button",
-            draggable: "true",
-            "aria-label": `Drag ${pin.title || "saved pin"}`
-          }
-        });
-        const setCover = createElement("button", {
-          className: "secondary-button compact-button",
-          text: board.coverUrl === pin.url ? "Cover" : "Set cover",
-          attributes: { type: "button" }
-        });
-        const remove = createElement("button", {
-          className: "secondary-button compact-button",
-          text: "Remove",
-          attributes: { type: "button" }
-        });
-
-        pinDragHandle.addEventListener("dragstart", (event) => {
-          event.dataTransfer.effectAllowed = "move";
-          setDragPayload(event, { type: "pin", boardId: board.id, pinUrl: pin.url });
-          item.classList.add("is-dragging");
-        });
-        pinDragHandle.addEventListener("dragend", () => item.classList.remove("is-dragging"));
-        item.addEventListener("dragover", (event) => event.preventDefault());
-        item.addEventListener("drop", (event) => {
-          event.preventDefault();
-          const payload = readDragPayload(event);
-
-          if (payload?.type === "pin" && payload.boardId === board.id) {
-            reorderPins(board.id, payload.pinUrl, pin.url);
-          }
-        });
-        setCover.addEventListener("click", () => setBoardCover(board.id, pin));
-        remove.addEventListener("click", () => removePinFromBoard(board.id, pin.url));
-        link.appendChild(image);
-        pinActions.append(pinDragHandle, setCover, remove);
-        item.append(link, pinActions);
-        pinGrid.appendChild(item);
-      });
-
-      card.append(cover, header, renameForm, pinGrid);
+      card.append(createBoardCollage(board), header, renameForm);
       container.appendChild(card);
     });
   };
@@ -746,6 +858,7 @@
       }
     });
 
+    window.addEventListener("hashchange", renderBoardsPage);
     renderBoardsPage();
   };
 
