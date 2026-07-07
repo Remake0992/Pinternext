@@ -11,13 +11,17 @@
                 <div id="inputWrapper">
                     <input type="text" name="q" placeholder="Search for recipes, outfits, rooms..." autofocus required maxlength="64" data-feed-input />
                     <button type="submit">Search</button>
+                    <button class="secondary-button home-save-feed-button" type="button" data-save-feed>Save feed</button>
                 </div>
             </form>
 
             <section class="home-feed-keywords" aria-labelledby="saved-feeds-title">
                 <div class="section-title-row compact-title-row">
-                    <h2 id="saved-feeds-title">Saved feeds</h2>
-                    <p>Your saved keywords</p>
+                    <div>
+                        <h2 id="saved-feeds-title">Saved feeds</h2>
+                        <p>Keep keyword feeds for searches you revisit often.</p>
+                    </div>
+                    <span class="saved-feed-count" data-feed-count>0 saved</span>
                 </div>
                 <div data-feed-keywords></div>
             </section>

@@ -857,33 +857,129 @@ button:hover,
   margin: 0 auto;
 }
 
+.home-save-feed-button {
+  white-space: nowrap;
+}
+
 .home-feed-keywords {
   width: min(680px, 100%);
   margin: 1.35rem auto 0;
   padding: 1rem;
   text-align: left;
-  background: var(--surface);
+  background: linear-gradient(145deg, var(--surface-strong), var(--surface));
   border: 1px solid var(--border-color);
-  border-radius: 22px;
+  border-radius: 24px;
 }
 
 .compact-title-row {
-  align-items: center;
-  margin-bottom: 0.75rem;
+  align-items: flex-start;
+  margin-bottom: 0.9rem;
 }
 
 .compact-title-row h2 {
-  font-size: 1rem;
+  font-size: 1.08rem;
 }
 
 .compact-title-row p {
-  font-size: 0.88rem;
+  max-width: none;
+  margin: 0.25rem 0 0;
+  font-size: 0.9rem;
+  line-height: 1.35;
 }
 
-.home-feed-keyword-list {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.5rem;
+.saved-feed-count {
+  flex: 0 0 auto;
+  padding: 0.38rem 0.65rem;
+  color: var(--muted-color);
+  background: var(--surface);
+  border: 1px solid var(--border-color);
+  border-radius: 999px;
+  font-size: 0.8rem;
+  font-weight: 800;
+}
+
+.home-feed-empty {
+  display: grid;
+  gap: 0.25rem;
+  padding: 1rem;
+  color: var(--muted-color);
+  background: rgba(255, 255, 255, 0.045);
+  border: 1px dashed var(--border-color);
+  border-radius: 18px;
+}
+
+.home-feed-empty p {
+  margin: 0;
+  color: var(--fg-color);
+  font-size: 0.98rem;
+  font-weight: 800;
+}
+
+.home-feed-empty span {
+  font-size: 0.9rem;
+  line-height: 1.45;
+}
+
+.home-feed-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(12rem, 1fr));
+  gap: 0.7rem;
+}
+
+.home-feed-card {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: stretch;
+  overflow: hidden;
+  background: var(--surface);
+  border: 1px solid var(--border-color);
+  border-radius: 18px;
+}
+
+.home-feed-card-link {
+  display: grid;
+  gap: 0.18rem;
+  min-width: 0;
+  padding: 0.85rem;
+}
+
+.home-feed-card-link strong {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 1rem;
+}
+
+.home-feed-card-label,
+.home-feed-card-hint {
+  color: var(--muted-color);
+  font-size: 0.78rem;
+  font-weight: 800;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+}
+
+.home-feed-card-hint {
+  text-transform: none;
+  letter-spacing: 0;
+}
+
+.home-feed-remove {
+  width: auto;
+  padding: 0 0.75rem;
+  color: var(--muted-color);
+  background: transparent;
+  border-left: 1px solid var(--border-color);
+  border-radius: 0;
+  box-shadow: none;
+  font-size: 0.78rem;
+}
+
+.home-feed-remove:hover {
+  color: white;
+  background: var(--accent-color);
+  box-shadow: none;
+  transform: none;
 }
 
 #inputWrapper,
@@ -1679,6 +1775,27 @@ html[data-theme="dark"] footer a:hover {
     max-width: 10rem;
   }
 
+  .home-feed-keywords {
+    padding: 0.85rem;
+  }
+
+  .compact-title-row {
+    flex-direction: column;
+    gap: 0.55rem;
+  }
+
+  .saved-feed-count {
+    align-self: flex-start;
+  }
+
+  .home-feed-list {
+    grid-template-columns: 1fr;
+  }
+
+  .home-feed-remove {
+    width: auto;
+  }
+
   .boards-page {
     width: 100%;
     padding: 4.5rem 0.75rem 2rem;
@@ -1839,6 +1956,7 @@ html[data-theme="dark"] footer a:hover {
   }
 
   .pin-button,
+  .home-save-feed-button,
   .board-card-header .secondary-button,
   .pin-dialog-header button,
   .board-pin-actions .secondary-button {

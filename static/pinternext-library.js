@@ -1,6 +1,7 @@
 (() => {
   const feedKey = "pinternext-feed-keywords";
   const boardsKey = "pinternext-boards";
+  let expandedBoardId = null;
 
   const readJson = (key, fallback) => {
     try {
@@ -106,29 +107,39 @@
   };
 
   const renderFeedKeywords = () => {
+    const feed = getFeed();
+
+    document.querySelectorAll("[data-feed-count]").forEach((counter) => {
+      counter.textContent = `${feed.length} saved`;
+    });
+
     document.querySelectorAll("[data-feed-keywords]").forEach((container) => {
-      const feed = getFeed();
       container.replaceChildren();
 
       if (feed.length === 0) {
-        container.appendChild(createElement("p", {
-          className: "empty-inline",
-          text: "No saved feeds yet. Save a search to see it here."
-        }));
+        const empty = createElement("div", { className: "home-feed-empty" });
+        empty.append(
+          createElement("p", { text: "No saved feeds yet." }),
+          createElement("span", { text: "Type a search above, then use Save feed to keep that keyword here." })
+        );
+        container.appendChild(empty);
         return;
       }
 
-      const list = createElement("div", { className: "home-feed-keyword-list" });
+      const list = createElement("div", { className: "home-feed-list" });
 
       feed.forEach((phrase) => {
-        const chip = createElement("span", { className: "feed-manager-chip" });
+        const card = createElement("article", { className: "home-feed-card" });
         const link = createElement("a", {
-          text: phrase,
+          className: "home-feed-card-link",
           attributes: { href: `search.php?q=${encodeURIComponent(phrase)}` }
         });
+        const label = createElement("span", { className: "home-feed-card-label", text: "Saved feed" });
+        const title = createElement("strong", { text: phrase });
+        const hint = createElement("span", { className: "home-feed-card-hint", text: "Open ideas" });
         const remove = createElement("button", {
-          className: "feed-remove-button",
-          text: "×",
+          className: "home-feed-remove",
+          text: "Remove",
           attributes: {
             type: "button",
             "aria-label": `Remove ${phrase} from saved feeds`
@@ -136,8 +147,9 @@
         });
 
         remove.addEventListener("click", () => removeFeedPhrase(phrase));
-        chip.append(link, remove);
-        list.appendChild(chip);
+        link.append(label, title, hint);
+        card.append(link, remove);
+        list.appendChild(card);
       });
 
       container.appendChild(list);
@@ -473,6 +485,10 @@
   };
 
   const deleteBoard = (boardId) => {
+    if (expandedBoardId === boardId) {
+      expandedBoardId = null;
+    }
+
     saveBoards(getBoards().filter((board) => board.id !== boardId));
     renderBoardsPage();
   };
@@ -504,33 +520,23 @@
     return next;
   };
 
-  const getOpenBoardId = () => {
-    const hash = window.location.hash || "";
+  const getOpenBoardId = () => expandedBoardId;
 
-    if (!hash.startsWith("#board-")) {
-      return null;
-    }
-
-    try {
-      return decodeURIComponent(hash.slice(7));
-    } catch (error) {
-      return null;
+  const clearBoardHash = () => {
+    if ((window.location.hash || "").startsWith("#board-")) {
+      window.history.replaceState("", document.title, window.location.pathname + window.location.search);
     }
   };
 
   const openBoard = (boardId) => {
-    const nextHash = `#board-${encodeURIComponent(boardId)}`;
-
-    if (window.location.hash === nextHash) {
-      renderBoardsPage();
-      return;
-    }
-
-    window.location.hash = nextHash;
+    expandedBoardId = boardId;
+    clearBoardHash();
+    renderBoardsPage();
   };
 
   const closeBoard = () => {
-    window.history.pushState("", document.title, window.location.pathname + window.location.search);
+    expandedBoardId = null;
+    clearBoardHash();
     renderBoardsPage();
   };
 
@@ -925,7 +931,8 @@
       }
     });
 
-    window.addEventListener("hashchange", renderBoardsPage);
+    expandedBoardId = null;
+    clearBoardHash();
     renderBoardsPage();
   };
 
