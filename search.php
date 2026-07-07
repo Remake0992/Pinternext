@@ -15,10 +15,9 @@ require "misc/header.php";
     <form class="search-container" action="search.php" method="get" autocomplete="off" role="search">
         <h1><a class="no-decoration accent logo-wordmark" href="./"><span class="logo-dot">P</span>internext</a></h1>
         <div class="search-input-row">
-            <input type="text" name="q" placeholder="Search images" value="<?php echo $query_escaped; ?>" required maxlength="64" data-feed-input>
+            <input type="text" name="q" placeholder="Search images" value="<?php echo $query_escaped; ?>" required maxlength="64">
             <button type="submit">Search</button>
         </div>
-        <button class="secondary-button save-search-button" type="button" data-save-feed>Save feed</button>
     </form>
 
     <main>
