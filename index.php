@@ -14,6 +14,14 @@
                 </div>
             </form>
 
+            <section class="home-feed-keywords" aria-labelledby="saved-feeds-title">
+                <div class="section-title-row compact-title-row">
+                    <h2 id="saved-feeds-title">Saved feeds</h2>
+                    <p>Your saved keywords</p>
+                </div>
+                <div data-feed-keywords></div>
+            </section>
+
         </section>
     </main>
 <?php require "misc/footer.php"; ?>

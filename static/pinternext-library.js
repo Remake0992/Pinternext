@@ -61,12 +61,14 @@
     }
 
     renderFeed();
+    renderFeedKeywords();
     return true;
   };
 
   const removeFeedPhrase = (phrase) => {
     saveFeed(getFeed().filter((item) => item !== phrase));
     renderFeed();
+    renderFeedKeywords();
   };
 
   const fetchFeedImages = async (phrase, bookmark = null) => {
@@ -101,6 +103,45 @@
     }
 
     return { images, nextBookmark };
+  };
+
+  const renderFeedKeywords = () => {
+    document.querySelectorAll("[data-feed-keywords]").forEach((container) => {
+      const feed = getFeed();
+      container.replaceChildren();
+
+      if (feed.length === 0) {
+        container.appendChild(createElement("p", {
+          className: "empty-inline",
+          text: "No saved feeds yet. Save a search to see it here."
+        }));
+        return;
+      }
+
+      const list = createElement("div", { className: "home-feed-keyword-list" });
+
+      feed.forEach((phrase) => {
+        const chip = createElement("span", { className: "feed-manager-chip" });
+        const link = createElement("a", {
+          text: phrase,
+          attributes: { href: `search.php?q=${encodeURIComponent(phrase)}` }
+        });
+        const remove = createElement("button", {
+          className: "feed-remove-button",
+          text: "×",
+          attributes: {
+            type: "button",
+            "aria-label": `Remove ${phrase} from saved feeds`
+          }
+        });
+
+        remove.addEventListener("click", () => removeFeedPhrase(phrase));
+        chip.append(link, remove);
+        list.appendChild(chip);
+      });
+
+      container.appendChild(list);
+    });
   };
 
   const renderFeed = () => {
@@ -721,7 +762,7 @@
     const openBoardId = getOpenBoardId();
     const selectedBoard = openBoardId ? boards.find((board) => board.id === openBoardId) : null;
 
-    container.classList.remove("is-board-open");
+    container.classList.toggle("is-board-open", Boolean(selectedBoard));
     container.replaceChildren();
 
     if (boards.length === 0) {
@@ -734,24 +775,21 @@
       return;
     }
 
-    if (openBoardId && selectedBoard) {
-      renderOpenBoard(container, selectedBoard);
-      return;
-    }
-
     if (openBoardId && !selectedBoard) {
       window.history.replaceState("", document.title, window.location.pathname + window.location.search);
     }
 
     boards.forEach((board) => {
       const pins = board.pins || [];
+      const isExpanded = selectedBoard?.id === board.id;
       const card = createElement("article", {
-        className: "board-card board-summary-card",
+        className: `board-card board-summary-card${isExpanded ? " is-expanded" : ""}`,
         attributes: {
           "data-board-id": board.id,
           role: "button",
           tabindex: "0",
-          "aria-label": `Open ${board.name} board with ${pins.length} pins`
+          "aria-expanded": isExpanded ? "true" : "false",
+          "aria-label": `${isExpanded ? "Expanded" : "Open"} ${board.name} board with ${pins.length} pins`
         }
       });
       const header = createElement("div", { className: "board-card-header" });
@@ -775,6 +813,11 @@
       const deleteButton = createElement("button", {
         className: "secondary-button compact-button",
         text: "Delete",
+        attributes: { type: "button" }
+      });
+      const closeButton = createElement("button", {
+        className: "secondary-button compact-button board-collapse-button",
+        text: "Collapse",
         attributes: { type: "button" }
       });
       const { renameForm, renameInput } = createBoardRenameForm(board);
@@ -803,13 +846,16 @@
         if (event.target.closest("a, button, input, form")) {
           return;
         }
-        openBoard(board.id);
+
+        if (!isExpanded) {
+          openBoard(board.id);
+        }
       });
       card.addEventListener("keydown", (event) => {
         if (event.target.closest("a, button, input, form")) {
           return;
         }
-        if (event.key === "Enter" || event.key === " ") {
+        if ((event.key === "Enter" || event.key === " ") && !isExpanded) {
           event.preventDefault();
           openBoard(board.id);
         }
@@ -823,10 +869,31 @@
         }
       });
       deleteButton.addEventListener("click", () => deleteBoard(board.id));
+      closeButton.addEventListener("click", closeBoard);
       actions.append(dragHandle, renameButton, deleteButton);
-      header.append(title, actions);
 
+      if (isExpanded) {
+        actions.appendChild(closeButton);
+      }
+
+      header.append(title, actions);
       card.append(createBoardCollage(board), header, renameForm);
+
+      if (isExpanded) {
+        const masonry = createElement("div", { className: "board-open-masonry" });
+
+        if (pins.length === 0) {
+          masonry.appendChild(createElement("p", {
+            className: "empty-inline",
+            text: "This board is empty. Search for ideas and hit Pin."
+          }));
+        } else {
+          pins.forEach((pin) => masonry.appendChild(createBoardPinItem(board, pin)));
+        }
+
+        card.appendChild(masonry);
+      }
+
       container.appendChild(card);
     });
   };
@@ -1094,6 +1161,7 @@
   };
 
   renderFeed();
+  renderFeedKeywords();
   initFeedControls();
   initBoardsPage();
   initPreviewViewer();
