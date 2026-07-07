@@ -279,6 +279,16 @@
         coverWrap.appendChild(coverImg);
       }
 
+      /* Name + count label overlaid on the cover (hidden when expanded) */
+      const coverLabel = createElement("div", { className: "board-cover-label" });
+      const coverLabelName = createElement("span", { className: "board-cover-name", text: board.name });
+      const coverLabelCount = createElement("span", {
+        className: "board-cover-count",
+        text: `${pins.length} pin${pins.length !== 1 ? "s" : ""}`
+      });
+      coverLabel.append(coverLabelName, coverLabelCount);
+      coverWrap.appendChild(coverLabel);
+
       /* clicking the cover (or anywhere on the card header) toggles expand */
       const toggleExpand = () => {
         if (expandedBoards.has(board.id)) {
@@ -294,7 +304,7 @@
         if (chevron) chevron.classList.toggle("is-open", card.classList.contains("is-expanded"));
       };
 
-      coverWrap.addEventListener("click", toggleExpand);
+      /* Cover click bubbles up to .board-card-header which handles the toggle */
 
       /* ── collapsed header row ── */
       const meta = createElement("div", { className: "board-meta" });
@@ -452,7 +462,18 @@
       });
 
       body.appendChild(pinGrid);
-      card.append(coverWrap, meta, renameForm, body);
+
+      /* Wrap cover + meta in a header div so they sit side-by-side when expanded */
+      const cardHeader = createElement("div", { className: "board-card-header" });
+      cardHeader.addEventListener("click", (e) => {
+        /* Only toggle if the click wasn't on an action button inside meta */
+        if (!e.target.closest(".board-meta-right")) {
+          toggleExpand();
+        }
+      });
+      cardHeader.append(coverWrap, meta);
+
+      card.append(cardHeader, renameForm, body);
       container.appendChild(card);
     });
   };
