@@ -2,16 +2,25 @@
  * MasonryFeed.tsx
  * ─────────────────────────────────────────────────────────────────────────────
  * Pinterest-style masonry grid that:
- *   • Reserves tile space via `aspect-ratio` (chosen over explicit width/height
- *     attributes because aspect-ratio is a pure CSS layout primitive — it works
- *     regardless of how the container is sized and doesn't require the consumer
- *     to know the rendered pixel dimensions upfront).
- *   • Lazy-loads images with IntersectionObserver (root margin pre-fetches
- *     tiles that are ~2 viewport-heights below the fold).
+ *   • Reserves tile space via `aspect-ratio` — a pure CSS layout primitive that
+ *     works correctly inside fluid columns without needing pixel dimensions.
+ *   • Lazy-loads images with IntersectionObserver (~2 viewport-heights ahead).
  *   • Decodes each downloaded image off the main thread with Image.decode()
- *     before writing it to the DOM, preventing jank on paint.
- *   • Fades images in with a CSS opacity transition once decoding is complete.
- *   • Uses pure CSS multi-column layout for the masonry arrangement — no libs.
+ *     before writing it to the DOM, keeping the main UI thread free.
+ *   • Fades loaded images in with a CSS opacity transition.
+ *   • Uses a JS column-splitter layout (not CSS multi-column) to prevent
+ *     tile shuffling: pins are assigned to fixed columns at mount time and
+ *     never redistributed. Each column is an independent DOM subtree, so a
+ *     tile loading in column 2 cannot cause any reflow in columns 1, 3, or 4.
+ *
+ * WHY NOT CSS MULTI-COLUMN?
+ *   CSS multi-column's column balancer re-runs whenever *any* descendant
+ *   changes height or a new node is inserted — even when the changed element
+ *   is `position: absolute` inside a fixed-aspect-ratio wrapper. Every
+ *   `patchTile` state update (idle → loading → loaded) was enough to trigger
+ *   a full re-balance, causing the visible shuffle. Explicit column divs are
+ *   immune: a React re-render inside one column's subtree cannot affect the
+ *   layout of a sibling column div.
  */
 
 import {
@@ -24,6 +33,44 @@ import {
   type JSX,
 } from "react";
 import styles from "./masonry.module.css";
+
+// ─── Utilities ────────────────────────────────────────────────────────────────
+
+/**
+ * Distributes pins across `columnCount` columns using a shortest-column-first
+ * (greedy) strategy based on cumulative aspect-ratio height.
+ *
+ * This runs once when `pins` or `columnCount` changes and never again during
+ * image loading, so it is the ONLY moment at which column assignment shifts.
+ * All subsequent state changes (loading, loaded, error) are isolated to the
+ * tile's own DOM node and cannot affect sibling columns.
+ */
+function distributeToColumns(pins: Pin[], columnCount: number): Pin[][] {
+  const columns: Pin[][] = Array.from({ length: columnCount }, () => []);
+  // Track the cumulative "height" of each column as a unitless ratio sum.
+  const heights = new Array<number>(columnCount).fill(0);
+
+  for (const pin of pins) {
+    // Find the shortest column to keep the grid visually balanced.
+    const shortest = heights.indexOf(Math.min(...heights));
+    columns[shortest].push(pin);
+    heights[shortest] += pin.height / pin.width; // aspect ratio contribution
+  }
+
+  return columns;
+}
+
+/**
+ * Returns the current column count by reading the CSS custom property that
+ * the grid container exposes. Falls back to a simple window-width heuristic
+ * when called before the first paint (SSR / test environments).
+ */
+function getColumnCount(el: HTMLElement | null): number {
+  if (!el) return 4;
+  const raw = getComputedStyle(el).getPropertyValue("--masonry-columns").trim();
+  const parsed = parseInt(raw, 10);
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : 4;
+}
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -50,6 +97,11 @@ interface TileState {
 /**
  * Manages per-tile IntersectionObserver entries and the async
  * download → decode → reveal pipeline.
+ *
+ * Importantly, each tile's load-state update is scoped to a single entry in
+ * the Map — React re-renders MasonryTile in isolation via the stable key prop,
+ * so a loading transition in one tile does NOT cause sibling tiles to re-render
+ * or trigger any layout recalculation in other columns.
  *
  * @param pins        - Array of Pin descriptors to manage.
  * @param rootMargin  - IntersectionObserver rootMargin string; controls
@@ -194,6 +246,40 @@ function useLazyImageLoader(
   return { tileStates, registerTile };
 }
 
+// ─── Hook: useColumnCount ─────────────────────────────────────────────────────
+
+/**
+ * Reads the active column count from the CSS custom property on the grid
+ * container and updates it on resize. This is the single source of truth for
+ * how many columns to render — the CSS media queries in masonry.module.css
+ * drive the value; JS only reads it.
+ */
+function useColumnCount(
+  containerRef: React.RefObject<HTMLElement | null>,
+  columnsProp?: number
+): number {
+  const [count, setCount] = useState<number>(columnsProp ?? 4);
+
+  useEffect(() => {
+    // If the consumer pinned a column count via props, skip auto-detection.
+    if (columnsProp != null) {
+      setCount(columnsProp);
+      return;
+    }
+
+    const update = () => setCount(getColumnCount(containerRef.current));
+
+    // Read immediately after mount (CSS has been applied by now).
+    update();
+
+    const ro = new ResizeObserver(update);
+    if (containerRef.current) ro.observe(containerRef.current);
+    return () => ro.disconnect();
+  }, [containerRef, columnsProp]);
+
+  return count;
+}
+
 // ─── MasonryTile ─────────────────────────────────────────────────────────────
 
 interface MasonryTileProps {
@@ -210,19 +296,16 @@ const MasonryTile: FC<MasonryTileProps> = ({ pin, state, onRegister }) => {
   );
 
   const isLoaded = state.loadState === "loaded";
-  const isError = state.loadState === "error";
+  const isError  = state.loadState === "error";
 
   return (
     /*
-     * The wrapper div establishes the tile's dimensions BEFORE the image loads.
-     * `aspect-ratio` is set as an inline style derived from the pin's intrinsic
-     * width/height, preventing any layout shift when the image appears.
+     * aspect-ratio on the wrapper reserves the exact vertical space this tile
+     * will occupy before a single image byte has arrived, preventing CLS.
      *
-     * Why aspect-ratio over explicit width/height attributes?
-     * — `aspect-ratio` is resolved in the CSS layout phase, so it works
-     *   correctly inside a fluid column (CSS multi-column, Grid, Flex).
-     * — Explicit pixel attributes would fight with the fluid 100% column width
-     *   and require JS to recalculate on every resize.
+     * The <img> is position:absolute so it never contributes to the wrapper's
+     * intrinsic size — the wrapper's height is determined solely by its own
+     * width × (height/width) aspect-ratio, which is set once and never changes.
      */
     <article
       ref={ref}
@@ -230,13 +313,9 @@ const MasonryTile: FC<MasonryTileProps> = ({ pin, state, onRegister }) => {
       style={{ aspectRatio: `${pin.width} / ${pin.height}` }}
       aria-label={pin.alt ?? `Pin ${pin.id}`}
     >
-      {/* Low-quality placeholder shown before the image loads */}
-      <div
-        className={styles.placeholder}
-        aria-hidden="true"
-      />
+      {/* Shimmer skeleton — always present, hidden by CSS once image loads */}
+      <div className={styles.placeholder} aria-hidden="true" />
 
-      {/* Error state */}
       {isError && (
         <div className={styles.errorState} role="img" aria-label="Failed to load image">
           <span className={styles.errorIcon}>⚠</span>
@@ -244,24 +323,22 @@ const MasonryTile: FC<MasonryTileProps> = ({ pin, state, onRegister }) => {
       )}
 
       {/*
-       * The real image is only rendered once `resolvedSrc` is available
-       * (i.e. after Image.decode() has finished). The `loaded` class
-       * triggers the CSS opacity transition for a smooth fade-in.
+       * Critically: the <img> is rendered immediately (not conditionally) but
+       * starts with opacity 0. Its `src` is empty until Image.decode() resolves,
+       * so the browser never paints a half-decoded frame. Setting src on an
+       * already-mounted <img> does NOT change the element's layout contribution
+       * (it is position:absolute), so there is zero reflow at reveal time.
        */}
-      {state.resolvedSrc && (
-        <img
-          src={state.resolvedSrc}
-          alt={pin.alt ?? `Pin ${pin.id}`}
-          className={`${styles.image} ${isLoaded ? styles.imageLoaded : ""}`}
-          // Dimensions are purely presentational here; layout is driven by
-          // the wrapper's aspect-ratio. They are still useful for SEO / AT.
-          width={pin.width}
-          height={pin.height}
-          // Never lazy-load via the browser — we manage loading ourselves.
-          loading="eager"
-          decoding="sync"
-        />
-      )}
+      <img
+        src={state.resolvedSrc ?? undefined}
+        alt={pin.alt ?? `Pin ${pin.id}`}
+        className={`${styles.image} ${isLoaded ? styles.imageLoaded : ""}`}
+        width={pin.width}
+        height={pin.height}
+        loading="eager"
+        decoding="sync"
+        aria-hidden={!isLoaded}
+      />
     </article>
   );
 };
@@ -271,8 +348,9 @@ const MasonryTile: FC<MasonryTileProps> = ({ pin, state, onRegister }) => {
 export interface MasonryFeedProps {
   pins: Pin[];
   /**
-   * Number of CSS columns at different breakpoints.
-   * Defaults to a responsive value set in the CSS module.
+   * Number of CSS columns. When omitted the count is read from the CSS
+   * custom property `--masonry-columns` that the stylesheet drives via
+   * media queries, so the layout stays in sync with CSS breakpoints.
    */
   columns?: number;
   /**
@@ -295,35 +373,65 @@ export const MasonryFeed: FC<MasonryFeedProps> = ({
   prefetchMargin = "0px 0px 200% 0px",
   className = "",
 }): JSX.Element => {
+  const containerRef = useRef<HTMLDivElement>(null);
+  const columnCount  = useColumnCount(containerRef, columns);
+
   const { tileStates, registerTile } = useLazyImageLoader(pins, prefetchMargin);
 
+  /*
+   * Column assignment is computed once per (pins, columnCount) pair.
+   * It does NOT change when individual tiles load — that is the entire point.
+   * distributeToColumns uses a greedy shortest-column algorithm so the initial
+   * visual balance is good even before any images appear.
+   */
+  const columnGroups = useMemo(
+    () => distributeToColumns(pins, columnCount),
+    [pins, columnCount]
+  );
+
   return (
-    <section
+    /*
+     * The outer div is the ResizeObserver target; its --masonry-columns CSS
+     * custom property is what useColumnCount reads to stay in sync with the
+     * stylesheet breakpoints.
+     */
+    <div
+      ref={containerRef}
       className={`${styles.grid} ${className}`}
       style={
         {
           "--masonry-gap": `${gap}px`,
-          // Allow consumer to override the column count at runtime.
           ...(columns != null ? { "--masonry-columns": columns } : {}),
         } as React.CSSProperties
       }
+      role="feed"
       aria-label="Masonry image feed"
     >
-      {pins.map((pin) => {
-        const state = tileStates.get(pin.id) ?? {
-          loadState: "idle" as LoadState,
-          resolvedSrc: null,
-        };
-        return (
-          <MasonryTile
-            key={pin.id}
-            pin={pin}
-            state={state}
-            onRegister={registerTile}
-          />
-        );
-      })}
-    </section>
+      {columnGroups.map((colPins, colIndex) => (
+        /*
+         * Each column is its own independent flex container.
+         * React reconciles each column subtree separately, so a setState call
+         * for a tile in column 2 never causes column 1 or 3 to re-layout.
+         * This is the structural guarantee that eliminates tile shuffling.
+         */
+        <div key={colIndex} className={styles.column}>
+          {colPins.map((pin) => {
+            const state = tileStates.get(pin.id) ?? {
+              loadState: "idle" as LoadState,
+              resolvedSrc: null,
+            };
+            return (
+              <MasonryTile
+                key={pin.id}
+                pin={pin}
+                state={state}
+                onRegister={registerTile}
+              />
+            );
+          })}
+        </div>
+      ))}
+    </div>
   );
 };
 

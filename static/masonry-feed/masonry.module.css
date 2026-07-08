@@ -1,25 +1,28 @@
 /**
  * masonry.module.css
  * ─────────────────────────────────────────────────────────────────────────────
- * Layout strategy: CSS multi-column (column-count + column-fill: balance).
+ * Layout strategy: explicit column divs rendered by JS (not CSS multi-column).
  *
- * Why multi-column instead of CSS Grid?
- * ─ CSS Grid requires JS to know each item's row span before paint.
- *   Without it you get a uniform-row grid, not a true masonry layout.
- *   (The experimental `grid-template-rows: masonry` is not yet in stable
- *   Chromium/Firefox without a flag, so it can't be relied upon in 2025.)
- * ─ CSS multi-column lays items in natural document order down each column
- *   and wraps them automatically — exactly what Pinterest does.
- * ─ No JavaScript column-balancing math; the browser handles it natively.
+ * WHY NOT CSS MULTI-COLUMN?
+ * ─ CSS multi-column's internal column balancer re-runs whenever any descendant
+ *   changes height or a new node is inserted — even a `position: absolute`
+ *   child inside an `aspect-ratio` wrapper triggers a style recalc that causes
+ *   all columns to reshuffle. That was the source of the tile-shuffle bug.
  *
- * Limitation: reading order is top→bottom within each column, not left→right
- * across the row. For a social feed this is acceptable and expected.
+ * WHY EXPLICIT COLUMN DIVS?
+ * ─ Each column is an independent DOM subtree. A React setState inside column 2
+ *   only reconciles column 2's children; the browser never recalculates the
+ *   geometry of columns 1, 3, or 4.
+ * ─ The column assignment (distributeToColumns) runs once per (pins, columnCount)
+ *   change — never during individual image loads.
+ * ─ CSS Grid lays the column divs side-by-side; each column div is a Flexbox
+ *   that stacks tiles vertically. No JS arithmetic needed for widths or gaps.
  */
 
 /* ── Design tokens ────────────────────────────────────────────────────────── */
 :root {
-  --masonry-columns: 4;   /* default; overridden by inline style from props */
-  --masonry-gap: 16px;    /* default; overridden by inline style from props */
+  --masonry-columns: 4;   /* default; overridden by media queries + inline style */
+  --masonry-gap: 16px;    /* default; overridden by inline style from props      */
   --tile-radius: 16px;
   --placeholder-color: #e9e9eb;       /* light-mode skeleton */
   --placeholder-shimmer-start: #e9e9eb;
@@ -38,48 +41,71 @@
 
 /* ── Grid container ───────────────────────────────────────────────────────── */
 .grid {
-  column-count: var(--masonry-columns);
-  column-gap: var(--masonry-gap);
+  /*
+   * CSS Grid places the column <div>s side-by-side.
+   * `--masonry-columns` is set to the correct value by the media queries below;
+   * JS reads it via getComputedStyle in useColumnCount so the column-div count
+   * always mirrors CSS — no duplicated breakpoint logic in TypeScript.
+   */
+  display: grid;
+  grid-template-columns: repeat(var(--masonry-columns), 1fr);
+  gap: var(--masonry-gap);
   width: 100%;
-  /* Prevent a column break from splitting a tile's box shadow / border-radius */
-  orphans: 1;
-  widows: 1;
+  align-items: start; /* columns are independent; don't stretch to equal height */
 }
 
-/* Responsive column counts — override with the `columns` prop if needed */
+/* ── Responsive column counts ─────────────────────────────────────────────── */
+/*
+ * These rules set ONLY the custom property. JS reads it in useColumnCount so
+ * the rendered column-div count always mirrors CSS — single source of truth.
+ * If the consumer passes `columns` as a prop, the inline style overrides these.
+ */
 @media (max-width: 479px) {
-  .grid { column-count: 2; }
+  .grid { --masonry-columns: 2; }
 }
 
 @media (min-width: 480px) and (max-width: 767px) {
-  .grid { column-count: 2; }
+  .grid { --masonry-columns: 2; }
 }
 
 @media (min-width: 768px) and (max-width: 1023px) {
-  .grid { column-count: 3; }
+  .grid { --masonry-columns: 3; }
 }
 
 @media (min-width: 1024px) and (max-width: 1439px) {
-  .grid { column-count: 4; }
+  .grid { --masonry-columns: 4; }
 }
 
 @media (min-width: 1440px) {
-  .grid { column-count: 5; }
+  .grid { --masonry-columns: 5; }
+}
+
+/* ── Column div ───────────────────────────────────────────────────────────── */
+.column {
+  /*
+   * Flexbox stacks tiles top-to-bottom within the column.
+   * gap drives inter-tile spacing consistently with the grid gap.
+   * min-width: 0 prevents flex blowout on very narrow containers.
+   */
+  display: flex;
+  flex-direction: column;
+  gap: var(--masonry-gap);
+  min-width: 0;
 }
 
 /* ── Tile wrapper ─────────────────────────────────────────────────────────── */
 .tile {
   /*
-   * break-inside: avoid  →  no column break in the middle of a tile.
-   * display: inline-block →  required companion rule for break-inside to work
-   *                          reliably in all current engines.
+   * `position: relative` establishes the containing block for the absolutely-
+   * positioned <img> and placeholder children.
+   *
+   * The tile's height is driven entirely by its `aspect-ratio` inline style
+   * (set from pin.width / pin.height). Because all children are
+   * `position: absolute`, they never contribute to the wrapper's intrinsic
+   * size and can never cause a reflow in sibling tiles or columns.
    */
-  break-inside: avoid;
-  display: inline-block;
-
   position: relative;
   width: 100%;
-  margin-bottom: var(--masonry-gap);
   border-radius: var(--tile-radius);
   overflow: hidden;
 
