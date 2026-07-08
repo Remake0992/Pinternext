@@ -12,6 +12,6 @@ if (isset($images)) {
 ?>
 </footer>
 <script src="/static/theme-toggle.js" defer></script>
-<script src="/static/pinternext-library.js" defer></script>
+<script src="/static/pinternext-library.js?v=2" defer></script>
 </body>
 </html>
