@@ -23,7 +23,7 @@ require "misc/header.php";
     <main>
         <section class="results-heading" aria-labelledby="results-title">
             <h2 id="results-title">Ideas for “<?php echo $query_escaped; ?>”</h2>
-            <p>Scroll the masonry board, open any pin, then save favorites to private boards.</p>
+            <p>Scroll the masonry grid and click any image to open it.</p>
         </section>
 
 <?php
@@ -107,10 +107,10 @@ $search = function ($query, $bookmark) use ($prepare_search_curl_obj) {
             $safe_proxy_url = htmlspecialchars($proxy_url, ENT_QUOTES, 'UTF-8');
             $safe_source_url = htmlspecialchars($url, ENT_QUOTES, 'UTF-8');
             $safe_title = htmlspecialchars($query, ENT_QUOTES, 'UTF-8');
-            echo "<article class='img-result' data-image-url='$safe_source_url' data-proxy-url='$safe_proxy_url' data-pin-title='$safe_title'>";
+            echo "<article class='img-result'>";
             echo "<a class='pin-open-link' href='$safe_proxy_url' rel='noopener noreferrer'>";
             echo "<img loading='lazy' decoding='async' src='$safe_proxy_url' alt='Pinterest result for $safe_title'></a>";
-            echo "<button class='pin-button' type='button' data-pin-button>Pin</button></article>";
+            echo "</article>";
         }
     }
     
