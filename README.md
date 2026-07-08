@@ -38,18 +38,14 @@ Use Docker Compose:
 ```sh
 services:
   pinternext:
-    image: node:20-alpine
     container_name: pinternext
-    working_dir: /app
-    command: sh -c "npm install && npm run dev"
+    image: ghcr.io/remake0992/pinternext:latest
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
     ports:
-      - "3032:3000"
-    volumes:
-      - /appdata/pinternext:/app
-      - /appdata/pinternext-node-modules:/app/node_modules
-    environment:
-      - HOST=0.0.0.0
-      - PORT=3000
+      - '8034:8080'
     restart: unless-stopped
 ```
 
