@@ -22,41 +22,41 @@
   const createPreviewDialog = () => {
     const backdrop = createElement("div", {
       className: "preview-dialog-backdrop",
-      attributes: { hidden: "" }
+      attributes: { hidden: "", role: "dialog", "aria-modal": "true", "aria-label": "Image preview" }
     });
-    const dialog = createElement("section", {
-      className: "preview-dialog",
-      attributes: {
-        role: "dialog",
-        "aria-modal": "true",
-        "aria-label": "Image preview"
-      }
-    });
+
     const close = createElement("button", {
       className: "preview-close",
-      text: "Close",
-      attributes: { type: "button" }
+      attributes: { type: "button", "aria-label": "Close preview" }
     });
-    const media = createElement("div", { className: "preview-media" });
-    const image = createElement("img", { attributes: { alt: "Image preview", "data-preview-image": "" } });
+    // SVG ✕ icon
+    const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+    svg.setAttribute("viewBox", "0 0 24 24"); svg.setAttribute("fill", "none");
+    svg.setAttribute("stroke", "currentColor"); svg.setAttribute("stroke-width", "2.5");
+    svg.setAttribute("stroke-linecap", "round"); svg.setAttribute("aria-hidden", "true");
+    svg.setAttribute("width", "18"); svg.setAttribute("height", "18");
+    [["M18 6L6 18"], ["M6 6L18 18"]].forEach(([d]) => {
+      const p = document.createElementNS("http://www.w3.org/2000/svg", "path");
+      p.setAttribute("d", d);
+      svg.appendChild(p);
+    });
+    close.appendChild(svg);
 
-    close.addEventListener("click", () => {
-      backdrop.hidden = true;
+    const image = createElement("img", {
+      className: "preview-image",
+      attributes: { alt: "Image preview", "data-preview-image": "" }
     });
+
+    const hideDialog = () => { backdrop.hidden = true; };
+    close.addEventListener("click", hideDialog);
     backdrop.addEventListener("click", (event) => {
-      if (event.target === backdrop) {
-        backdrop.hidden = true;
-      }
+      if (event.target === backdrop) hideDialog();
     });
     document.addEventListener("keydown", (event) => {
-      if (event.key === "Escape" && !backdrop.hidden) {
-        backdrop.hidden = true;
-      }
+      if (event.key === "Escape" && !backdrop.hidden) hideDialog();
     });
 
-    media.appendChild(image);
-    dialog.append(close, media);
-    backdrop.appendChild(dialog);
+    backdrop.append(close, image);
     document.body.appendChild(backdrop);
     return backdrop;
   };
@@ -71,11 +71,7 @@
 
   document.addEventListener("click", (event) => {
     const link = event.target.closest(".pin-open-link");
-
-    if (!link) {
-      return;
-    }
-
+    if (!link) return;
     event.preventDefault();
     const img = link.querySelector("img");
     openPreview(link.href, img?.alt || "");
