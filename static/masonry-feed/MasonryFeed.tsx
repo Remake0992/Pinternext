@@ -13,17 +13,24 @@
  *     never redistributed. Each column is an independent DOM subtree, so a
  *     tile loading in column 2 cannot cause any reflow in columns 1, 3, or 4.
  *
- * WHY NOT CSS MULTI-COLUMN?
- *   CSS multi-column's column balancer re-runs whenever *any* descendant
- *   changes height or a new node is inserted — even when the changed element
- *   is `position: absolute` inside a fixed-aspect-ratio wrapper. Every
- *   `patchTile` state update (idle → loading → loaded) was enough to trigger
- *   a full re-balance, causing the visible shuffle. Explicit column divs are
- *   immune: a React re-render inside one column's subtree cannot affect the
- *   layout of a sibling column div.
+ * WHY IMPERATIVE DOM WRITES FOR LOAD STATE?
+ *   Any React setState call re-renders MasonryFeed, which re-runs the
+ *   columnGroups.map() and touches every column's props — giving React reason
+ *   to reconcile all column subtrees simultaneously and producing the visible
+ *   shuffle. The fix is to bypass the React reconciler entirely for per-tile
+ *   load state: image reveal writes directly to the DOM via refs (src + class),
+ *   so React never sees the update and no re-render occurs.
+ *
+ * WHY SYNCHRONOUS INITIAL COLUMN COUNT?
+ *   useColumnCount previously initialised to a hardcoded fallback (4) then
+ *   fired setCount() after mount with the real CSS value. That state change
+ *   recomputed columnGroups via useMemo, reassigning every pin to a different
+ *   column — itself a visible shuffle. The fix is to derive the initial column
+ *   count synchronously from window.innerWidth during the first useMemo call,
+ *   so the column layout is stable from the very first paint.
  */
 
-import {
+import React, {
   useCallback,
   useEffect,
   useMemo,
@@ -62,17 +69,35 @@ function distributeToColumns(pins: Pin[], columnCount: number): Pin[][] {
 
 /**
  * Returns the current column count by reading the CSS custom property that
- * the grid container exposes. Falls back to a simple window-width heuristic
- * when called before the first paint (SSR / test environments).
+ * the grid container exposes.
  */
 function getColumnCount(el: HTMLElement | null): number {
-  if (!el) return 4;
+  if (!el) return guessColumnCount();
   const raw = getComputedStyle(el).getPropertyValue("--masonry-columns").trim();
   const parsed = parseInt(raw, 10);
-  return Number.isFinite(parsed) && parsed > 0 ? parsed : 4;
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : guessColumnCount();
+}
+
+/**
+ * Synchronous column-count estimate from window.innerWidth, mirroring the
+ * CSS media-query breakpoints. Used only for the very first render so that
+ * distributeToColumns() never has to run a second time due to a post-mount
+ * state update changing the count from a wrong initial value.
+ */
+function guessColumnCount(): number {
+  if (typeof window === "undefined") return 4; // SSR guard
+  const w = window.innerWidth;
+  if (w < 480)  return 2;
+  if (w < 768)  return 2;
+  if (w < 1024) return 3;
+  if (w < 1440) return 4;
+  return 5;
 }
 
 // ─── Types ────────────────────────────────────────────────────────────────────
+
+/** Passed through dataset so the IntersectionObserver callback can look up the pin. */
+type PinId = string | number;
 
 export interface Pin {
   id: string | number;
@@ -84,96 +109,87 @@ export interface Pin {
   alt?: string;
 }
 
-type LoadState = "idle" | "loading" | "loaded" | "error";
 
-interface TileState {
-  loadState: LoadState;
-  /** Object-URL or original URL handed to <img> once decode() resolves. */
-  resolvedSrc: string | null;
-}
 
-// ─── Hook: useLazyImageLoader ─────────────────────────────────────────────────
+// ─── Hook: useMasonryLoader ───────────────────────────────────────────────────
 
 /**
- * Manages per-tile IntersectionObserver entries and the async
- * download → decode → reveal pipeline.
+ * Handles the IntersectionObserver watch loop and the
+ * fetch → Image.decode() → DOM-write reveal pipeline.
  *
- * Importantly, each tile's load-state update is scoped to a single entry in
- * the Map — React re-renders MasonryTile in isolation via the stable key prop,
- * so a loading transition in one tile does NOT cause sibling tiles to re-render
- * or trigger any layout recalculation in other columns.
+ * CRITICAL DESIGN DECISION — imperative DOM writes instead of React state:
+ *   Every React setState call schedules a re-render of the component that owns
+ *   the state. Because tileStates used to live in MasonryFeed, every patchTile()
+ *   call re-rendered MasonryFeed, re-ran columnGroups.map(), and passed new
+ *   props to every column div — giving React a reason to reconcile all column
+ *   subtrees at once. Even though each tile's DOM was ultimately unchanged,
+ *   the reconciliation pass itself was enough to make the browser re-evaluate
+ *   layout for the whole grid.
  *
- * @param pins        - Array of Pin descriptors to manage.
- * @param rootMargin  - IntersectionObserver rootMargin string; controls
- *                      how far ahead of the viewport images are prefetched.
+ *   The fix: state for each tile lives only in that tile's own refs. Reveal
+ *   is performed by writing directly to the img.src and toggling a CSS class
+ *   on the <article> element. React never sees these writes. No re-render,
+ *   no reconciliation, no layout recalculation in any other tile.
+ *
+ * @param pins       - Array of Pin descriptors.
+ * @param rootMargin - IntersectionObserver rootMargin for prefetch distance.
  */
-function useLazyImageLoader(
+function useMasonryLoader(
   pins: Pin[],
   rootMargin = "0px 0px 200% 0px"
 ): {
-  tileStates: Map<Pin["id"], TileState>;
+  /** Call with the tile's <article> element on mount, null on unmount. */
   registerTile: (id: Pin["id"], el: HTMLElement | null) => void;
 } {
-  // Keyed by pin.id for O(1) lookups during observer callbacks.
-  const [tileStates, setTileStates] = useState<Map<Pin["id"], TileState>>(
-    () => new Map(pins.map((p) => [p.id, { loadState: "idle", resolvedSrc: null }]))
-  );
+  // pin.id → { article, img } DOM refs for direct imperative writes.
+  const domMap = useRef(new Map<Pin["id"], { article: HTMLElement; img: HTMLImageElement }>());
 
-  // Stable ref so the IntersectionObserver callback closes over the latest map.
-  const tileStatesRef = useRef(tileStates);
-  tileStatesRef.current = tileStates;
+  // Tracks which pins are already loading/loaded so the observer doesn't
+  // re-trigger. A Set of ids is sufficient — no React state needed.
+  const loadingSet = useRef(new Set<Pin["id"]>());
 
-  // pin.id → source URL lookup so the observer callback needs no closure over pins.
+  // pin.id → url, stable across renders as long as pins array is stable.
   const pinUrlMap = useMemo(
     () => new Map(pins.map((p) => [p.id, p.url])),
     [pins]
   );
 
-  // pin.id → DOM element map so we can unobserve after loading starts.
-  const elementMap = useRef(new Map<Pin["id"], HTMLElement>());
-
-  // Single shared observer for all tiles — cheaper than one per tile.
   const observerRef = useRef<IntersectionObserver | null>(null);
 
-  /** Patches a single tile's state immutably. */
-  const patchTile = useCallback((id: Pin["id"], patch: Partial<TileState>) => {
-    setTileStates((prev) => {
-      const next = new Map(prev);
-      next.set(id, { ...prev.get(id)!, ...patch });
-      return next;
-    });
-  }, []);
-
   /**
-   * Core loading pipeline:
-   *  1. Mark tile as "loading" immediately (stops re-triggering).
-   *  2. Create a new HTMLImageElement and set its src (network fetch).
-   *  3. Await Image.decode() — runs on a compositor/worker thread.
-   *  4. On success, hand the src to React state so the visible <img> can use it.
-   *  5. On failure, mark as "error" so the placeholder remains visible.
+   * Core pipeline. Everything here is imperative — zero React state updates.
+   *
+   *  1. Mark as loading in the Set (prevents double-trigger).
+   *  2. Fetch via new Image() + set src.
+   *  3. Await img.decode() off the main thread.
+   *  4. Write resolved src directly to the mounted <img> DOM node.
+   *  5. Toggle CSS class on the <article> to trigger the opacity transition.
+   *  6. On error: add an error class so CSS can style the placeholder.
    */
-  const loadImage = useCallback(
-    async (id: Pin["id"], url: string) => {
-      patchTile(id, { loadState: "loading" });
+  const loadImage = useCallback(async (id: Pin["id"], url: string) => {
+    loadingSet.current.add(id);
 
-      const img = new Image();
-      img.src = url;
-      // `crossOrigin` may be needed if your CDN requires it for decode().
-      img.crossOrigin = "anonymous";
+    const offscreen = new Image();
+    offscreen.src = url;
+    offscreen.crossOrigin = "anonymous";
 
-      try {
-        // Image.decode() resolves when the image is fully parsed and GPU-ready.
-        // It rejects if the resource fails to load, so no separate onerror needed.
-        await img.decode();
-        patchTile(id, { loadState: "loaded", resolvedSrc: url });
-      } catch {
-        patchTile(id, { loadState: "error" });
+    const nodes = domMap.current.get(id);
+
+    try {
+      await offscreen.decode();
+      // Write directly to the DOM — React is not involved.
+      if (nodes) {
+        nodes.img.src = url;
+        nodes.article.classList.add(styles.tileLoaded);
       }
-    },
-    [patchTile]
-  );
+    } catch {
+      if (nodes) {
+        nodes.article.classList.add(styles.tileError);
+      }
+    }
+  }, [pinUrlMap]); // pinUrlMap in deps keeps the lint happy; it's stable in practice
 
-  // (Re)create observer whenever rootMargin or the load callback changes.
+  // Build/rebuild observer when rootMargin changes (rare).
   useEffect(() => {
     observerRef.current?.disconnect();
 
@@ -182,35 +198,23 @@ function useLazyImageLoader(
         for (const entry of entries) {
           if (!entry.isIntersecting) continue;
 
-          // dataset.pinId is set in registerTile below.
           const id = (entry.target as HTMLElement).dataset.pinId!;
-          const current = tileStatesRef.current.get(id);
-
-          // Skip tiles already loading or loaded.
-          if (!current || current.loadState !== "idle") continue;
+          if (loadingSet.current.has(id)) continue;
 
           const url = pinUrlMap.get(id);
           if (!url) continue;
 
-          // Unobserve immediately — we only need one trigger per tile.
           observerRef.current!.unobserve(entry.target);
-          elementMap.current.delete(id);
-
           loadImage(id, url);
         }
       },
-      {
-        // Prefetch ~2 viewport-heights below the fold; no horizontal margin.
-        rootMargin,
-        threshold: 0,
-      }
+      { rootMargin, threshold: 0 }
     );
 
-    // Re-observe any tiles that are still idle (e.g. after a config change).
-    for (const [id, el] of elementMap.current) {
-      const state = tileStatesRef.current.get(id);
-      if (state?.loadState === "idle") {
-        observerRef.current.observe(el);
+    // Re-observe any tiles already mounted but not yet loading.
+    for (const [id, { article }] of domMap.current) {
+      if (!loadingSet.current.has(id)) {
+        observerRef.current.observe(article);
       }
     }
 
@@ -218,61 +222,70 @@ function useLazyImageLoader(
   }, [rootMargin, pinUrlMap, loadImage]);
 
   /**
-   * Called by each <MasonryTile> via a callback ref.
-   * Registers (or unregisters) the tile's wrapper element with the observer.
+   * Callback ref handed to each MasonryTile.
+   * On mount  : stores the article + img refs and begins observing.
+   * On unmount: cleans up the observer and the domMap entry.
    */
   const registerTile = useCallback(
     (id: Pin["id"], el: HTMLElement | null) => {
-      const observer = observerRef.current;
-
       if (el) {
+        const img = el.querySelector("img") as HTMLImageElement;
         el.dataset.pinId = String(id);
-        elementMap.current.set(id, el);
+        domMap.current.set(id, { article: el, img });
 
-        const state = tileStatesRef.current.get(id);
-        if (state?.loadState === "idle" && observer) {
-          observer.observe(el);
+        if (!loadingSet.current.has(id) && observerRef.current) {
+          observerRef.current.observe(el);
         }
       } else {
-        // Ref is being detached (tile unmounted).
-        const existing = elementMap.current.get(id);
-        if (existing && observer) observer.unobserve(existing);
-        elementMap.current.delete(id);
+        const nodes = domMap.current.get(id);
+        if (nodes && observerRef.current) {
+          observerRef.current.unobserve(nodes.article);
+        }
+        domMap.current.delete(id);
+        // Leave loadingSet entry — prevents re-fetch if the tile remounts.
       }
     },
-    [] // stable — elementMap and observerRef are refs, not state
+    [] // stable: domMap, loadingSet, observerRef are all refs
   );
 
-  return { tileStates, registerTile };
+  return { registerTile };
 }
 
 // ─── Hook: useColumnCount ─────────────────────────────────────────────────────
 
 /**
- * Reads the active column count from the CSS custom property on the grid
- * container and updates it on resize. This is the single source of truth for
- * how many columns to render — the CSS media queries in masonry.module.css
- * drive the value; JS only reads it.
+ * Returns a stable column count for the lifetime of a given (pins, columnsProp)
+ * pair. The initial value is derived synchronously from window.innerWidth so
+ * distributeToColumns() is called exactly once with the correct count and the
+ * column layout never shifts due to a post-mount state update.
+ *
+ * On viewport resize the count does update — but a genuine breakpoint crossing
+ * necessarily reshuffles columns regardless of this component, so that is
+ * acceptable and expected behavior.
  */
 function useColumnCount(
   containerRef: React.RefObject<HTMLElement | null>,
   columnsProp?: number
 ): number {
-  const [count, setCount] = useState<number>(columnsProp ?? 4);
+  // Initialise synchronously from window.innerWidth so the first useMemo
+  // call in MasonryFeed gets the right count and never needs to re-run.
+  const [count, setCount] = useState<number>(() => columnsProp ?? guessColumnCount());
 
   useEffect(() => {
-    // If the consumer pinned a column count via props, skip auto-detection.
     if (columnsProp != null) {
       setCount(columnsProp);
       return;
     }
 
-    const update = () => setCount(getColumnCount(containerRef.current));
+    // Re-read from computed style now that CSS has been applied.
+    // In most cases this will equal guessColumnCount() and trigger no re-render.
+    const precise = getColumnCount(containerRef.current);
+    setCount(precise);
 
-    // Read immediately after mount (CSS has been applied by now).
-    update();
-
-    const ro = new ResizeObserver(update);
+    // Watch for breakpoint crossings on resize.
+    const ro = new ResizeObserver(() => {
+      setCount(getColumnCount(containerRef.current));
+    });
     if (containerRef.current) ro.observe(containerRef.current);
     return () => ro.disconnect();
   }, [containerRef, columnsProp]);
@@ -284,28 +297,25 @@ function useColumnCount(
 
 interface MasonryTileProps {
   pin: Pin;
-  state: TileState;
-  onRegister: (id: Pin["id"], el: HTMLElement | null) => void;
+  onRegister: (id: PinId, el: HTMLElement | null) => void;
 }
 
-const MasonryTile: FC<MasonryTileProps> = ({ pin, state, onRegister }) => {
-  // Callback ref pattern: fires on mount (el = HTMLElement) and unmount (el = null).
+/**
+ * A single tile. Deliberately has NO load-state props — all load-state
+ * changes happen via direct DOM writes in useMasonryLoader, so this component
+ * never re-renders after its initial mount. React.memo enforces that contract.
+ */
+const MasonryTile: FC<MasonryTileProps> = ({ pin, onRegister }) => {
   const ref = useCallback(
     (el: HTMLElement | null) => onRegister(pin.id, el),
     [pin.id, onRegister]
   );
 
-  const isLoaded = state.loadState === "loaded";
-  const isError  = state.loadState === "error";
-
   return (
     /*
-     * aspect-ratio on the wrapper reserves the exact vertical space this tile
-     * will occupy before a single image byte has arrived, preventing CLS.
-     *
-     * The <img> is position:absolute so it never contributes to the wrapper's
-     * intrinsic size — the wrapper's height is determined solely by its own
-     * width × (height/width) aspect-ratio, which is set once and never changes.
+     * aspect-ratio reserves the tile's exact height before any image data
+     * arrives. The <img> is position:absolute so it contributes zero intrinsic
+     * size — the article's height is fixed from the moment it mounts.
      */
     <article
       ref={ref}
@@ -313,35 +323,34 @@ const MasonryTile: FC<MasonryTileProps> = ({ pin, state, onRegister }) => {
       style={{ aspectRatio: `${pin.width} / ${pin.height}` }}
       aria-label={pin.alt ?? `Pin ${pin.id}`}
     >
-      {/* Shimmer skeleton — always present, hidden by CSS once image loads */}
+      {/* Shimmer skeleton — hidden by CSS (.tileLoaded .placeholder) on reveal */}
       <div className={styles.placeholder} aria-hidden="true" />
 
-      {isError && (
-        <div className={styles.errorState} role="img" aria-label="Failed to load image">
-          <span className={styles.errorIcon}>⚠</span>
-        </div>
-      )}
+      {/* Error indicator — shown by CSS when .tileError is added to <article> */}
+      <div className={styles.errorState} aria-hidden="true">
+        <span className={styles.errorIcon}>⚠</span>
+      </div>
 
       {/*
-       * Critically: the <img> is rendered immediately (not conditionally) but
-       * starts with opacity 0. Its `src` is empty until Image.decode() resolves,
-       * so the browser never paints a half-decoded frame. Setting src on an
-       * already-mounted <img> does NOT change the element's layout contribution
-       * (it is position:absolute), so there is zero reflow at reveal time.
+       * src starts empty. useMasonryLoader writes the decoded URL directly to
+       * this node via domMap refs — no React state update, no re-render.
+       * The opacity transition fires purely from the CSS class toggle on <article>.
        */}
       <img
-        src={state.resolvedSrc ?? undefined}
+        src=""
         alt={pin.alt ?? `Pin ${pin.id}`}
-        className={`${styles.image} ${isLoaded ? styles.imageLoaded : ""}`}
+        className={styles.image}
         width={pin.width}
         height={pin.height}
         loading="eager"
         decoding="sync"
-        aria-hidden={!isLoaded}
+        aria-hidden="true"
       />
     </article>
   );
 };
+
+const MemoMasonryTile = /*#__PURE__*/ React.memo(MasonryTile);
 
 // ─── MasonryFeed (public API) ─────────────────────────────────────────────────
 
@@ -376,13 +385,15 @@ export const MasonryFeed: FC<MasonryFeedProps> = ({
   const containerRef = useRef<HTMLDivElement>(null);
   const columnCount  = useColumnCount(containerRef, columns);
 
-  const { tileStates, registerTile } = useLazyImageLoader(pins, prefetchMargin);
+  // registerTile writes directly to the DOM — MasonryFeed never re-renders
+  // in response to an individual tile loading.
+  const { registerTile } = useMasonryLoader(pins, prefetchMargin);
 
   /*
    * Column assignment is computed once per (pins, columnCount) pair.
-   * It does NOT change when individual tiles load — that is the entire point.
-   * distributeToColumns uses a greedy shortest-column algorithm so the initial
-   * visual balance is good even before any images appear.
+   * Because columnCount is initialised synchronously from window.innerWidth,
+   * this memo runs with the correct value on the very first render and will
+   * not re-run until a genuine breakpoint crossing or a props change.
    */
   const columnGroups = useMemo(
     () => distributeToColumns(pins, columnCount),
@@ -390,11 +401,6 @@ export const MasonryFeed: FC<MasonryFeedProps> = ({
   );
 
   return (
-    /*
-     * The outer div is the ResizeObserver target; its --masonry-columns CSS
-     * custom property is what useColumnCount reads to stay in sync with the
-     * stylesheet breakpoints.
-     */
     <div
       ref={containerRef}
       className={`${styles.grid} ${className}`}
@@ -408,27 +414,19 @@ export const MasonryFeed: FC<MasonryFeedProps> = ({
       aria-label="Masonry image feed"
     >
       {columnGroups.map((colPins, colIndex) => (
-        /*
-         * Each column is its own independent flex container.
-         * React reconciles each column subtree separately, so a setState call
-         * for a tile in column 2 never causes column 1 or 3 to re-layout.
-         * This is the structural guarantee that eliminates tile shuffling.
-         */
         <div key={colIndex} className={styles.column}>
-          {colPins.map((pin) => {
-            const state = tileStates.get(pin.id) ?? {
-              loadState: "idle" as LoadState,
-              resolvedSrc: null,
-            };
-            return (
-              <MasonryTile
-                key={pin.id}
-                pin={pin}
-                state={state}
-                onRegister={registerTile}
-              />
-            );
-          })}
+          {colPins.map((pin) => (
+            /*
+             * MemoMasonryTile has no load-state props, so React.memo's shallow
+             * comparison will always bail out after the first render — each tile
+             * renders exactly once for its lifetime.
+             */
+            <MemoMasonryTile
+              key={pin.id}
+              pin={pin}
+              onRegister={registerTile}
+            />
+          ))}
         </div>
       ))}
     </div>

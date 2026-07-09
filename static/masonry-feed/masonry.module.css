@@ -159,12 +159,19 @@
   to   { background-position: -200% center; }
 }
 
-/* Stop the shimmer animation once the image is loaded to free GPU resources.
-   The :has() selector targets a tile article that contains a loaded image. */
-.tile:has(.imageLoaded) .placeholder {
+/*
+ * .tileLoaded/.tileError are added imperatively by useMasonryLoader via
+ * article.classList — no React state update, no re-render, no layout
+ * recalculation anywhere outside this single tile's composited paint.
+ */
+.tileLoaded .placeholder {
   animation: none;
-  /* Keep placeholder in place under the image (belt-and-suspenders) */
   opacity: 0;
+}
+
+/* Error icon hidden until .tileError is toggled on by the loader */
+.tileError .errorState {
+  display: flex;
 }
 
 /* ── Image ────────────────────────────────────────────────────────────────── */
@@ -180,24 +187,23 @@
   height: 100%;
   object-fit: cover;
 
-  /* Start invisible — fade-in is triggered by adding `.imageLoaded` */
+  /* Starts invisible; revealed by parent class toggle, not by a React prop */
   opacity: 0;
-  transition:
-    opacity var(--image-fade-duration) var(--image-fade-easing);
-
-  /* Avoid layout recalc when the transition runs; only composited props change */
+  transition: opacity var(--image-fade-duration) var(--image-fade-easing);
   will-change: opacity;
 }
 
-.imageLoaded {
+/* Triggered by article.classList.add(styles.tileLoaded) in useMasonryLoader */
+.tileLoaded .image {
   opacity: 1;
 }
 
 /* ── Error state ──────────────────────────────────────────────────────────── */
+/* Base: hidden by default; flex layout applied only when .tileError is set */
 .errorState {
   position: absolute;
   inset: 0;
-  display: flex;
+  display: none;
   align-items: center;
   justify-content: center;
   background-color: var(--placeholder-color);
