@@ -198,6 +198,23 @@
   opacity: 1;
 }
 
+/*
+ * Applied to <img> on initial render instead of src="".
+ *
+ * An empty src="" is NOT a no-op: the browser immediately issues a request
+ * for the current page URL. When that request resolves (or errors), the
+ * browser fires a load/error event which invalidates the img's intrinsic
+ * size and triggers a layout recalculation on every tile still waiting —
+ * the exact shuffle symptom reported ("fine for first row, broken elsewhere").
+ *
+ * display:none removes the element from layout entirely so its src state
+ * (empty, loading, or loaded) has zero effect on surrounding tiles.
+ * useMasonryLoader removes this class atomically with setting the real src.
+ */
+.imageHidden {
+  display: none;
+}
+
 /* ── Error state ──────────────────────────────────────────────────────────── */
 /* Base: hidden by default; flex layout applied only when .tileError is set */
 .errorState {

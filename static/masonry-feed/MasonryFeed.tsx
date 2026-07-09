@@ -173,21 +173,27 @@ function useMasonryLoader(
     offscreen.src = url;
     offscreen.crossOrigin = "anonymous";
 
-    const nodes = domMap.current.get(id);
-
     try {
       await offscreen.decode();
-      // Write directly to the DOM — React is not involved.
+
+      const nodes = domMap.current.get(id);
       if (nodes) {
+        // Set src while img is still display:none — no layout pass occurs.
         nodes.img.src = url;
+        // Unhide the img and trigger the fade in one synchronous class toggle.
+        // classList operations are batched by the browser into a single style
+        // recalc, so there is never a frame where src is set but display:none
+        // is already removed (which would show a flash of the old empty state).
+        nodes.img.classList.remove(styles.imageHidden);
         nodes.article.classList.add(styles.tileLoaded);
       }
     } catch {
+      const nodes = domMap.current.get(id);
       if (nodes) {
         nodes.article.classList.add(styles.tileError);
       }
     }
-  }, [pinUrlMap]); // pinUrlMap in deps keeps the lint happy; it's stable in practice
+  }, [pinUrlMap]); // pinUrlMap in deps satisfies the linter; it's stable in practice
 
   // Build/rebuild observer when rootMargin changes (rare).
   useEffect(() => {
@@ -332,14 +338,18 @@ const MasonryTile: FC<MasonryTileProps> = ({ pin, onRegister }) => {
       </div>
 
       {/*
-       * src starts empty. useMasonryLoader writes the decoded URL directly to
-       * this node via domMap refs — no React state update, no re-render.
-       * The opacity transition fires purely from the CSS class toggle on <article>.
+       * No src attribute at all on initial render — an empty src="" causes the
+       * browser to fetch the current page URL and then fire a load/error event
+       * that invalidates the img's intrinsic size, producing a layout
+       * recalculation on every still-pending tile (the remaining shuffle).
+       *
+       * Instead the img starts with display:none (via the .imageHidden class)
+       * so it participates in zero layout calculations. useMasonryLoader writes
+       * src and removes .imageHidden atomically once decode() resolves.
        */}
       <img
-        src=""
         alt={pin.alt ?? `Pin ${pin.id}`}
-        className={styles.image}
+        className={`${styles.image} ${styles.imageHidden}`}
         width={pin.width}
         height={pin.height}
         loading="eager"
