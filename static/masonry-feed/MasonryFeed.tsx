@@ -10,24 +10,23 @@
  *   • Fades loaded images in with a CSS opacity transition.
  *   • Uses a JS column-splitter layout (not CSS multi-column) to prevent
  *     tile shuffling: pins are assigned to fixed columns at mount time and
- *     never redistributed. Each column is an independent DOM subtree, so a
- *     tile loading in column 2 cannot cause any reflow in columns 1, 3, or 4.
+ *     never redistributed.
  *
- * WHY IMPERATIVE DOM WRITES FOR LOAD STATE?
- *   Any React setState call re-renders MasonryFeed, which re-runs the
- *   columnGroups.map() and touches every column's props — giving React reason
- *   to reconcile all column subtrees simultaneously and producing the visible
- *   shuffle. The fix is to bypass the React reconciler entirely for per-tile
- *   load state: image reveal writes directly to the DOM via refs (src + class),
- *   so React never sees the update and no re-render occurs.
+ * THE COMPLETE NO-SHUFFLE CONTRACT:
+ *   1. Column count is derived synchronously from window.innerWidth before the
+ *      first render — it is NEVER stored as React state. It lives in a ref.
+ *      distributeToColumns() therefore runs exactly once on mount and only
+ *      again on a genuine CSS-breakpoint crossing (which requires a full
+ *      re-render by definition anyway).
  *
- * WHY SYNCHRONOUS INITIAL COLUMN COUNT?
- *   useColumnCount previously initialised to a hardcoded fallback (4) then
- *   fired setCount() after mount with the real CSS value. That state change
- *   recomputed columnGroups via useMemo, reassigning every pin to a different
- *   column — itself a visible shuffle. The fix is to derive the initial column
- *   count synchronously from window.innerWidth during the first useMemo call,
- *   so the column layout is stable from the very first paint.
+ *   2. Per-tile load state (loading/loaded/error) is NEVER stored as React
+ *      state. Image reveal writes img.src and toggles CSS classes directly on
+ *      the DOM element. React never sees these writes, so no re-render and no
+ *      reconciliation of any column subtree occurs during image loading.
+ *
+ *   3. MasonryTile carries zero load-state props. React.memo guarantees it
+ *      renders exactly once per mount. The column div key is stable (colIndex),
+ *      the tile key is stable (pin.id) — React never unmounts/remounts a tile.
  */
 
 import React, {
@@ -68,36 +67,18 @@ function distributeToColumns(pins: Pin[], columnCount: number): Pin[][] {
 }
 
 /**
- * Returns the current column count by reading the CSS custom property that
- * the grid container exposes.
+ * Mirrors the CSS media-query breakpoints in masonry.module.css.
+ * Called synchronously during render — no DOM access needed.
  */
-function getColumnCount(el: HTMLElement | null): number {
-  if (!el) return guessColumnCount();
-  const raw = getComputedStyle(el).getPropertyValue("--masonry-columns").trim();
-  const parsed = parseInt(raw, 10);
-  return Number.isFinite(parsed) && parsed > 0 ? parsed : guessColumnCount();
-}
-
-/**
- * Synchronous column-count estimate from window.innerWidth, mirroring the
- * CSS media-query breakpoints. Used only for the very first render so that
- * distributeToColumns() never has to run a second time due to a post-mount
- * state update changing the count from a wrong initial value.
- */
-function guessColumnCount(): number {
-  if (typeof window === "undefined") return 4; // SSR guard
-  const w = window.innerWidth;
-  if (w < 480)  return 2;
-  if (w < 768)  return 2;
-  if (w < 1024) return 3;
-  if (w < 1440) return 4;
+function breakpointColumns(width: number): number {
+  if (width < 480)  return 2;
+  if (width < 768)  return 2;
+  if (width < 1024) return 3;
+  if (width < 1440) return 4;
   return 5;
 }
 
 // ─── Types ────────────────────────────────────────────────────────────────────
-
-/** Passed through dataset so the IntersectionObserver callback can look up the pin. */
-type PinId = string | number;
 
 export interface Pin {
   id: string | number;
@@ -257,53 +238,13 @@ function useMasonryLoader(
   return { registerTile };
 }
 
-// ─── Hook: useColumnCount ─────────────────────────────────────────────────────
 
-/**
- * Returns a stable column count for the lifetime of a given (pins, columnsProp)
- * pair. The initial value is derived synchronously from window.innerWidth so
- * distributeToColumns() is called exactly once with the correct count and the
- * column layout never shifts due to a post-mount state update.
- *
- * On viewport resize the count does update — but a genuine breakpoint crossing
- * necessarily reshuffles columns regardless of this component, so that is
- * acceptable and expected behavior.
- */
-function useColumnCount(
-  containerRef: React.RefObject<HTMLElement | null>,
-  columnsProp?: number
-): number {
-  // Initialise synchronously from window.innerWidth so the first useMemo
-  // call in MasonryFeed gets the right count and never needs to re-run.
-  const [count, setCount] = useState<number>(() => columnsProp ?? guessColumnCount());
-
-  useEffect(() => {
-    if (columnsProp != null) {
-      setCount(columnsProp);
-      return;
-    }
-
-    // Re-read from computed style now that CSS has been applied.
-    // In most cases this will equal guessColumnCount() and trigger no re-render.
-    const precise = getColumnCount(containerRef.current);
-    setCount(precise);
-
-    // Watch for breakpoint crossings on resize.
-    const ro = new ResizeObserver(() => {
-      setCount(getColumnCount(containerRef.current));
-    });
-    if (containerRef.current) ro.observe(containerRef.current);
-    return () => ro.disconnect();
-  }, [containerRef, columnsProp]);
-
-  return count;
-}
 
 // ─── MasonryTile ─────────────────────────────────────────────────────────────
 
 interface MasonryTileProps {
   pin: Pin;
-  onRegister: (id: PinId, el: HTMLElement | null) => void;
+  onRegister: (id: Pin["id"], el: HTMLElement | null) => void;
 }
 
 /**
@@ -392,23 +333,63 @@ export const MasonryFeed: FC<MasonryFeedProps> = ({
   prefetchMargin = "0px 0px 200% 0px",
   className = "",
 }): JSX.Element => {
-  const containerRef = useRef<HTMLDivElement>(null);
-  const columnCount  = useColumnCount(containerRef, columns);
-
-  // registerTile writes directly to the DOM — MasonryFeed never re-renders
-  // in response to an individual tile loading.
-  const { registerTile } = useMasonryLoader(pins, prefetchMargin);
+  /*
+   * columnCount is NEVER React state. It lives in a ref so that reading or
+   * writing it never schedules a re-render. The initial value is computed
+   * synchronously from window.innerWidth so the very first render already
+   * has the correct column layout — there is no "wrong initial value" that
+   * needs to be corrected in a useEffect, which was the root cause of every
+   * previous post-mount shuffle.
+   */
+  const columnCountRef = useRef<number>(
+    columns ?? (typeof window !== "undefined" ? breakpointColumns(window.innerWidth) : 4)
+  );
 
   /*
-   * Column assignment is computed once per (pins, columnCount) pair.
-   * Because columnCount is initialised synchronously from window.innerWidth,
-   * this memo runs with the correct value on the very first render and will
-   * not re-run until a genuine breakpoint crossing or a props change.
+   * columnGroups is also a ref. distributeToColumns() runs once here and is
+   * only repeated if a ResizeObserver detects a genuine breakpoint crossing,
+   * in which case forceUpdate() is called to re-render with the new layout.
+   * It is NEVER called in response to an image loading.
    */
-  const columnGroups = useMemo(
-    () => distributeToColumns(pins, columnCount),
-    [pins, columnCount]
+  const columnGroupsRef = useRef<Pin[][]>(
+    distributeToColumns(pins, columnCountRef.current)
   );
+
+  /*
+   * Minimal forceUpdate so ResizeObserver can trigger a re-render on
+   * breakpoint crossing. This is the ONLY place setState is used in the
+   * entire component tree, and it fires at most once per breakpoint boundary
+   * crossing — never during image loading.
+   */
+  const [, forceUpdate] = useState(0);
+
+  const containerRef = useRef<HTMLDivElement>(null);
+
+  // registerTile writes directly to the DOM — never causes a re-render.
+  const { registerTile } = useMasonryLoader(pins, prefetchMargin);
+
+  // Watch for genuine breakpoint crossings. Re-distribute only when the
+  // column count actually changes.
+  useEffect(() => {
+    if (columns != null) return; // consumer has pinned the count; skip
+
+    const ro = new ResizeObserver(() => {
+      const next = breakpointColumns(window.innerWidth);
+      if (next !== columnCountRef.current) {
+        columnCountRef.current  = next;
+        columnGroupsRef.current = distributeToColumns(pins, next);
+        forceUpdate(n => n + 1);
+      }
+    });
+    if (containerRef.current) ro.observe(containerRef.current);
+    return () => ro.disconnect();
+  }, [pins, columns]);
+
+  // If the `columns` prop changes, recompute synchronously.
+  if (columns != null && columns !== columnCountRef.current) {
+    columnCountRef.current  = columns;
+    columnGroupsRef.current = distributeToColumns(pins, columns);
+  }
 
   return (
     <div
@@ -423,14 +404,10 @@ export const MasonryFeed: FC<MasonryFeedProps> = ({
       role="feed"
       aria-label="Masonry image feed"
     >
-      {columnGroups.map((colPins, colIndex) => (
+      {columnGroupsRef.current.map((colPins, colIndex) => (
         <div key={colIndex} className={styles.column}>
           {colPins.map((pin) => (
-            /*
-             * MemoMasonryTile has no load-state props, so React.memo's shallow
-             * comparison will always bail out after the first render — each tile
-             * renders exactly once for its lifetime.
-             */
+            // No load-state props — React.memo bails out after first render.
             <MemoMasonryTile
               key={pin.id}
               pin={pin}
