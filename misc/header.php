@@ -7,4 +7,4 @@
     <meta name="referrer" content="no-referrer"/>
     <meta name="theme-color" content="#111111"/>
     <link rel="icon" type="image/svg+xml" href="/static/img/favicon.svg">
-    <link rel="stylesheet" type="text/css" href="/misc/style-dark.css?v=2">
+    <link rel="stylesheet" type="text/css" href="/misc/style-dark.css?v=3">

@@ -93,7 +93,7 @@ $search = function ($query, $bookmark) use ($prepare_search_curl_obj) {
     $data = json_decode($response);
     
     $images = [];
-    echo "<div class='img-container'>";
+    echo "<div class='img-container' role='feed' aria-label='Masonry image feed'>";
     
     if ($data && isset($data->resource_response->data->results)) {
         foreach ($data->resource_response->data->results as $result) {
@@ -102,14 +102,20 @@ $search = function ($query, $bookmark) use ($prepare_search_curl_obj) {
             }
 
             $url = $result->images->orig->url;
+            $width = isset($result->images->orig->width) ? (int) $result->images->orig->width : 0;
+            $height = isset($result->images->orig->height) ? (int) $result->images->orig->height : 0;
+            if ($width < 1 || $height < 1) {
+                $width = 2;
+                $height = 3;
+            }
+
             $images[] = $url;
             $proxy_url = "/image_proxy.php?url=" . urlencode($url);
             $safe_proxy_url = htmlspecialchars($proxy_url, ENT_QUOTES, 'UTF-8');
-            $safe_source_url = htmlspecialchars($url, ENT_QUOTES, 'UTF-8');
             $safe_title = htmlspecialchars($query, ENT_QUOTES, 'UTF-8');
-            echo "<article class='img-result'>";
+            echo "<article class='img-result' data-pin-width='$width' data-pin-height='$height' style='--pin-w:$width;--pin-h:$height'>";
             echo "<a class='pin-open-link' href='$safe_proxy_url' rel='noopener noreferrer'>";
-            echo "<img loading='lazy' decoding='async' src='$safe_proxy_url' alt='Pinterest result for $safe_title'></a>";
+            echo "<img loading='lazy' decoding='async' width='$width' height='$height' src='$safe_proxy_url' alt='Pinterest result for $safe_title'></a>";
             echo "</article>";
         }
     }
@@ -143,5 +149,6 @@ if ($result->bookmark !== null) {
 }
 ?>
     </main>
-    <script src="/static/infinite-scroll.js" defer></script>
+    <script src="/static/masonry.js?v=1"></script>
+    <script src="/static/infinite-scroll.js?v=2" defer></script>
 <?php include "misc/footer.php"; ?>

@@ -57,9 +57,13 @@
       const newImages = doc.querySelectorAll(".img-container .img-result");
       const nextLink = doc.querySelector(".next-page a");
 
-      newImages.forEach((image) => {
-        imageContainer.appendChild(document.importNode(image, true));
-      });
+      const imported = Array.from(newImages, (image) => document.importNode(image, true));
+
+      if (window.PinternextMasonry) {
+        window.PinternextMasonry.appendTiles(imported);
+      } else {
+        imported.forEach((image) => imageContainer.appendChild(image));
+      }
 
       updateFooterCount();
 
