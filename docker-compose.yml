@@ -2,6 +2,7 @@ services:
   pinternext:
     container_name: pinternext
     image: ghcr.io/remake0992/pinternext:latest
+    build: .
     cap_drop:
       - ALL
     security_opt:
