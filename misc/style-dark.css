@@ -10,6 +10,8 @@
   --surface-strong: rgba(255, 255, 255, 0.14);
   --shadow: 0 18px 50px rgba(0, 0, 0, 0.35);
   --radius: 24px;
+  --site-font: "Avenir Next", Avenir, "Century Gothic", Futura, ui-sans-serif, system-ui, sans-serif;
+  --wordmark-font: "Neue Haas Grotesk Display", "Helvetica Neue", Helvetica, Arial, sans-serif;
 }
 
 * {
@@ -24,7 +26,7 @@ body {
   min-height: 100vh;
   background: var(--main);
   color: var(--fg-color);
-  font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Arial, sans-serif;
+  font-family: var(--site-font);
   overflow-x: hidden;
   padding: 0 0 6rem;
   margin: 0;
@@ -870,6 +872,59 @@ html[data-theme="dark"] .top-action-link:hover,
 html[data-theme="dark"] .theme-toggle:hover,
 html[data-theme="dark"] footer a:hover {
   color: white;
+}
+
+/* Flat controls: hover feedback is limited to a slightly darker color. */
+input,
+html[data-theme="light"] input,
+html[data-theme="dark"] input,
+#inputWrapper,
+.search-input-row,
+html[data-theme="light"] #inputWrapper,
+html[data-theme="light"] .search-input-row,
+html[data-theme="dark"] #inputWrapper,
+html[data-theme="dark"] .search-input-row {
+  background: transparent;
+  box-shadow: none;
+}
+
+input:focus,
+html[data-theme="light"] input:focus,
+html[data-theme="dark"] input:focus {
+  background: transparent;
+  box-shadow: none;
+}
+
+#bodyHeader,
+.logo-wordmark {
+  font-family: var(--wordmark-font);
+  font-weight: 700;
+}
+
+button,
+.button-link {
+  transition: background-color 160ms ease;
+}
+
+button:hover,
+.button-link:hover {
+  background: var(--accent-hover);
+  box-shadow: none;
+  transform: none;
+}
+
+.secondary-button:hover,
+.top-action-link:hover,
+.theme-toggle:hover {
+  background: var(--surface);
+  box-shadow: none;
+  filter: brightness(0.9);
+}
+
+.preview-close,
+.preview-close:hover {
+  box-shadow: none;
+  transform: none;
 }
 
 @media only screen and (max-width: 750px) {
