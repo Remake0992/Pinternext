@@ -2,10 +2,6 @@ services:
   pinternext:
     container_name: pinternext
     image: ghcr.io/remake0992/pinternext:latest
-    build: .
-    cap_drop:
-      - ALL
-    security_opt:
-      - no-new-privileges:true
     ports:
-     - '8080:8080'
+      - "8034:8080"
+    restart: unless-stopped
