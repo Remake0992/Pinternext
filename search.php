@@ -11,19 +11,23 @@ require "misc/header.php";
 ?>
 <title><?php echo $query_escaped; ?> - Pinternext</title>
 </head>
-<body>
-    <form class="search-container" action="search.php" method="get" autocomplete="off" role="search">
-        <h1><a class="no-decoration accent logo-wordmark" href="./"><span class="logo-dot">P</span>internext</a></h1>
-        <div class="search-input-row">
-            <input type="text" name="q" placeholder="Search images" value="<?php echo $query_escaped; ?>" required maxlength="64">
+<body class="search-page">
+    <header class="search-container">
+        <a class="brand" href="./" aria-label="Pinternext home"><span class="logo-dot">P</span><span>Pinternext</span></a>
+        <form class="search-input-row" action="search.php" method="get" autocomplete="off" role="search">
+            <label class="sr-only" for="results-search">Search Pinterest images</label>
+            <span class="search-icon" aria-hidden="true"></span>
+            <input id="results-search" type="text" name="q" placeholder="Search images" value="<?php echo $query_escaped; ?>" required maxlength="64">
             <button type="submit">Search</button>
-        </div>
     </form>
+        <a class="header-support" href="./donate.php">Support Pinternext</a>
+    </header>
 
     <main>
         <section class="results-heading" aria-labelledby="results-title">
+            <p class="eyebrow">Search results</p>
             <h2 id="results-title">Ideas for “<?php echo $query_escaped; ?>”</h2>
-            <p>Scroll the masonry grid and click any image to open it.</p>
+            <p>Browse the collection and open any image for a closer look.</p>
         </section>
 
 <?php
