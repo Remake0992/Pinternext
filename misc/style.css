@@ -1,6 +1,6 @@
 :root {
-  --red: #435c72;
-  --red-dark: #304759;
+  --red: #e60023;
+  --red-dark: #ad081b;
   --text: #111111;
   --subtle-text: #5f5f5f;
   --surface: #ffffff;
@@ -48,17 +48,25 @@ input:focus { outline: 3px solid var(--focus); outline-offset: 3px; border-radiu
 
 /* Home */
 .mainContainer { width: min(1240px, calc(100% - 3rem)); margin: 0 auto; }
-.hero-panel { display: grid; place-items: center; min-height: min(610px, calc(100vh - 80px)); padding: clamp(4rem, 9vw, 7rem) 0; text-align: center; }
-.hero-content { max-width: 620px; }
+.hero-panel { display: grid; grid-template-columns: minmax(0, .92fr) minmax(390px, 1.08fr); gap: clamp(2rem, 6vw, 7rem); align-items: center; min-height: min(680px, calc(100vh - 80px)); padding: clamp(4rem, 9vw, 8rem) 0; }
+.hero-content { max-width: 560px; }
 .eyebrow { margin: 0 0 .7rem; color: var(--red); font-size: .82rem; font-weight: 800; letter-spacing: .075em; text-transform: uppercase; }
-#bodyHeader { max-width: 580px; margin: 0 auto; font-size: clamp(3.3rem, 5.5vw, 5.6rem); letter-spacing: -.07em; line-height: .95; }
-.hero-copy { max-width: 520px; margin: 1.35rem auto 2rem; color: var(--subtle-text); font-size: 1.12rem; line-height: 1.55; }
-.searchContainer { width: min(540px, 100%); margin: 0 auto; }
+#bodyHeader { max-width: 520px; margin: 0; font-size: clamp(3.3rem, 5.5vw, 5.6rem); letter-spacing: -.07em; line-height: .95; }
+.hero-copy { max-width: 460px; margin: 1.35rem 0 2rem; color: var(--subtle-text); font-size: 1.12rem; line-height: 1.55; }
+.searchContainer { width: min(540px, 100%); }
 #inputWrapper, .search-input-row { display: flex; align-items: center; gap: .7rem; min-height: 58px; padding: 5px 6px 5px 1rem; background: var(--surface-muted); border: 1px solid transparent; border-radius: var(--radius-pill); }
 #inputWrapper:focus-within, .search-input-row:focus-within { border-color: var(--focus); box-shadow: 0 0 0 2px var(--focus); }
 #inputWrapper input:focus, .search-input-row input:focus { outline: none; }
 .search-icon { width: 16px; height: 16px; flex: 0 0 16px; border: 2px solid #555; border-radius: 50%; position: relative; }
 .search-icon::after { content: ""; position: absolute; width: 7px; height: 2px; right: -5px; bottom: -3px; background: #555; transform: rotate(45deg); border-radius: 2px; }
+.idea-canvas { position: relative; min-height: 450px; }
+.idea-card { position: absolute; display: flex; align-items: end; overflow: hidden; padding: 1.1rem; color: #fff; border-radius: 28px; box-shadow: var(--shadow); font-size: 1.05rem; font-weight: 800; letter-spacing: -.02em; }
+.idea-card::before { content: ""; position: absolute; inset: 0; opacity: .78; background: linear-gradient(0deg, rgb(0 0 0 / 45%), transparent 55%); }
+.idea-card span { z-index: 1; }
+.card-interiors { top: 3%; left: 20%; width: 42%; height: 74%; background: linear-gradient(145deg, #e6b98a 0 35%, #8c604a 35% 55%, #d9d0bd 55%); transform: rotate(-4deg); }
+.card-style { top: 9%; right: 1%; width: 29%; height: 40%; background: linear-gradient(155deg, #e9d8ca 0 38%, #ae665d 39% 63%, #543a35 64%); transform: rotate(7deg); }
+.card-recipes { bottom: 3%; left: 2%; width: 34%; height: 34%; background: linear-gradient(135deg, #b94332 0 33%, #ecbf5d 34% 59%, #576943 60%); transform: rotate(6deg); }
+.card-garden { right: 7%; bottom: 1%; width: 34%; height: 35%; background: linear-gradient(145deg, #d6c27b 0 30%, #6f8b57 31% 70%, #2f543d 71%); transform: rotate(-5deg); }
 .discovery { display: flex; align-items: center; justify-content: space-between; gap: 2rem; padding: 4rem clamp(1.5rem, 6vw, 5rem); margin: 0 calc((1240px - 100vw) / 2) 5rem; background: var(--surface-soft); }
 .discovery h2 { margin: 0; font-size: clamp(1.8rem, 3vw, 3rem); letter-spacing: -.05em; }
 .quick-searches { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: .55rem; max-width: 550px; }
