@@ -1,6 +1,6 @@
 <h2 align="center">Pinternext</h2>
 
-> A privacy-respecting Pinterest-style image search with no login prompts. Forked from Binternet with quality of life features added (image previews, theme switcher, infinite scroll). 
+> A privacy-respecting Pinterest-style image search with no login prompts. Forked from Binternet with quality of life features added (image previews, theme switcher, caching, infinite scroll). 
 
 <div align="center">
 
@@ -14,16 +14,17 @@
 * Pinterest does not see the IP of the end user, only the instance IP.
 * Image proxy support.
 * Pinterest-inspired masonry frontend.
+* AI filter
 
 <h2 align="center">Screenshots</h2>
 
-<img width="1470" height="848" alt="image" src="https://github.com/user-attachments/assets/84e44941-ee7f-42e7-8d8b-c1dc45193924" />
+<img width="1486" height="858" alt="image" src="https://github.com/user-attachments/assets/24531f68-1170-4c2a-b2c0-b85eae949784" />
 
-<img width="1465" height="856" alt="image" src="https://github.com/user-attachments/assets/17510def-2e49-4a7f-85f7-3784f4d6d0ea" />
+<img width="1486" height="858" alt="image" src="https://github.com/user-attachments/assets/1d9f1262-a6a8-4951-85a9-97e5b99601e2" />
 
-<img width="1466" height="848" alt="image" src="https://github.com/user-attachments/assets/332c84de-11f7-4035-a71e-593008d23fb6" />
+<img width="1480" height="852" alt="image" src="https://github.com/user-attachments/assets/45ca08ca-8aae-4d32-82c1-44cafcbb474d" />
 
-<img width="1458" height="845" alt="image" src="https://github.com/user-attachments/assets/8d803d1b-cc3d-4593-b6f3-2710bff3600f" />
+<img width="1481" height="854" alt="image" src="https://github.com/user-attachments/assets/3a728ab3-56cc-4e4c-948b-11ba4f72def8" />
 
 <h2 align="center">Legal notice</h2>
 
@@ -40,16 +41,13 @@ services:
   pinternext:
     container_name: pinternext
     image: ghcr.io/remake0992/pinternext:latest
-    cap_drop:
-      - ALL
-    security_opt:
-      - no-new-privileges:true
     ports:
-      - '8034:8080'
+      - "8080:8080"
     restart: unless-stopped
 ```
 
 <h3 align="center">Credits</h3>
 
-* [LibreX](https://github.com/hnhx/librex) - a bit of misc code.
-* [LibreY](https://github.com/Ahwxorg/LibreY) - image proxy
+* [Binternet](https://github.com/Ahwxorg/Binternet) - Original Frontend.
+* [LibreX](https://github.com/hnhx/librex) - Misc code.
+* [LibreY](https://github.com/Ahwxorg/LibreY) - Image proxy.
