@@ -243,6 +243,7 @@ button:hover,
   font-style: italic;
   letter-spacing: -0.12em;
   line-height: 1;
+  transform: translateY(0.04em);
 }
 
 .logo-text {
