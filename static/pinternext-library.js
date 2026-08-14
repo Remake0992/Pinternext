@@ -18,6 +18,15 @@
   };
 
   let previewDialog = null;
+  const preloadedPreviews = new Set();
+
+  const preloadPreview = (proxyUrl) => {
+    if (!proxyUrl || preloadedPreviews.has(proxyUrl)) return;
+
+    preloadedPreviews.add(proxyUrl);
+    const image = new Image();
+    image.src = proxyUrl;
+  };
 
   const createPreviewDialog = () => {
     const backdrop = createElement("div", {
@@ -68,6 +77,16 @@
     image.alt = altText || "Image preview";
     previewDialog.hidden = false;
   };
+
+  document.addEventListener("pointerover", (event) => {
+    const link = event.target.closest(".pin-open-link");
+    if (link) preloadPreview(link.href);
+  });
+
+  document.addEventListener("focusin", (event) => {
+    const link = event.target.closest(".pin-open-link");
+    if (link) preloadPreview(link.href);
+  });
 
   document.addEventListener("click", (event) => {
     const link = event.target.closest(".pin-open-link");

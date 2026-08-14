@@ -560,6 +560,62 @@ footer a:hover {
   line-height: 1;
 }
 
+.ai-filter-toggle {
+  position: relative;
+  display: inline-grid;
+  place-items: center;
+  width: 2.45rem;
+  min-height: 2.45rem;
+  padding: 0;
+  color: var(--fg-color);
+  background: var(--surface);
+  border: 1px solid var(--border-color);
+  border-radius: 999px;
+  font-size: 0.7rem;
+  font-weight: 900;
+  letter-spacing: -0.08em;
+  line-height: 1;
+}
+
+.ai-filter-toggle::after {
+  position: absolute;
+  width: 1.55rem;
+  height: 2px;
+  content: "";
+  opacity: 0;
+  background: currentColor;
+  border-radius: 999px;
+  transform: rotate(-45deg);
+  transition: opacity 160ms ease;
+}
+
+.ai-filter-toggle:hover {
+  color: var(--fg-color);
+  background: var(--surface-strong);
+  box-shadow: none;
+  filter: none;
+}
+
+.ai-filter-toggle.is-active {
+  color: white;
+  background: var(--accent-color);
+  border-color: var(--accent-color);
+}
+
+.ai-filter-toggle.is-active::after {
+  opacity: 1;
+}
+
+.ai-filter-toggle.is-active:hover {
+  color: white;
+  background: var(--accent-hover);
+}
+
+.ai-filter-toggle:focus-visible {
+  outline: 3px solid rgba(230, 0, 35, 0.45);
+  outline-offset: 2px;
+}
+
 .footer-count {
   color: var(--muted-color);
 }
@@ -1052,8 +1108,10 @@ button:hover,
     transform: none;
   }
 
-  .theme-toggle {
+  .theme-toggle,
+  .ai-filter-toggle {
     width: 2.25rem;
+    min-height: 2.25rem;
   }
 
   .donate-container {

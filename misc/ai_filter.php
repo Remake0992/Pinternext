@@ -112,7 +112,6 @@ function pinternext_get_ai_labels(array $pin_ids): array
             }
 
             curl_multi_remove_handle($multi, $info["handle"]);
-            curl_close($info["handle"]);
             unset($handles[$key]);
         }
 

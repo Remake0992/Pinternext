@@ -19,7 +19,6 @@ require "misc/header.php";
             <input type="text" name="q" placeholder="Search images" value="<?php echo $query_escaped; ?>" required maxlength="64">
             <button type="submit">Search</button>
         </div>
-        <label><input type="checkbox" name="hide_ai_modified" value="1"<?php echo $hide_ai_modified ? " checked" : ""; ?>> Hide Pinterest-labeled AI-modified Pins</label>
     </form>
 
     <main>
@@ -118,21 +117,25 @@ $search = function ($query, $bookmark, $hide_ai_modified) use ($prepare_search_c
                 continue;
             }
 
-            $url = $result->images->orig->url;
-            $width = isset($result->images->orig->width) ? (int) $result->images->orig->width : 0;
-            $height = isset($result->images->orig->height) ? (int) $result->images->orig->height : 0;
+            $original_url = $result->images->orig->url;
+            $thumbnail = $result->images->{"474x"} ?? $result->images->{"236x"} ?? $result->images->orig;
+            $thumbnail_url = $thumbnail->url;
+            $width = isset($thumbnail->width) ? (int) $thumbnail->width : 0;
+            $height = isset($thumbnail->height) ? (int) $thumbnail->height : 0;
             if ($width < 1 || $height < 1) {
                 $width = 2;
                 $height = 3;
             }
 
-            $images[] = $url;
-            $proxy_url = "/image_proxy.php?url=" . urlencode($url);
-            $safe_proxy_url = htmlspecialchars($proxy_url, ENT_QUOTES, 'UTF-8');
+            $images[] = $original_url;
+            $thumbnail_proxy_url = "/image_proxy.php?url=" . urlencode($thumbnail_url);
+            $original_proxy_url = "/image_proxy.php?url=" . urlencode($original_url);
+            $safe_thumbnail_proxy_url = htmlspecialchars($thumbnail_proxy_url, ENT_QUOTES, 'UTF-8');
+            $safe_original_proxy_url = htmlspecialchars($original_proxy_url, ENT_QUOTES, 'UTF-8');
             $safe_title = htmlspecialchars($query, ENT_QUOTES, 'UTF-8');
             echo "<article class='img-result' data-pin-width='$width' data-pin-height='$height' style='--pin-w:$width;--pin-h:$height'>";
-            echo "<a class='pin-open-link' href='$safe_proxy_url' rel='noopener noreferrer'>";
-            echo "<img loading='lazy' decoding='async' width='$width' height='$height' src='$safe_proxy_url' alt='Pinterest result for $safe_title'></a>";
+            echo "<a class='pin-open-link' href='$safe_original_proxy_url' rel='noopener noreferrer'>";
+            echo "<img loading='lazy' decoding='async' width='$width' height='$height' src='$safe_thumbnail_proxy_url' alt='Pinterest result for $safe_title'></a>";
             echo "</article>";
         }
     }
