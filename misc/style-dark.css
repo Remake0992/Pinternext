@@ -217,15 +217,25 @@ button:hover,
 }
 
 #bodyHeader {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.04em;
   font-size: clamp(3.8rem, 13vw, 9.5rem);
+}
+
+.logo-wordmark {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.04em;
 }
 
 .logo-dot {
   display: inline-grid;
+  flex: 0 0 0.84em;
   place-items: center;
   width: 0.84em;
   height: 0.84em;
-  margin-right: 0.04em;
   color: white;
   background: var(--accent-color);
   border-radius: 50%;
@@ -233,7 +243,10 @@ button:hover,
   font-style: italic;
   letter-spacing: -0.12em;
   line-height: 1;
-  vertical-align: middle;
+}
+
+.logo-text {
+  display: block;
 }
 
 .mainContainer p,
