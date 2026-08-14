@@ -232,6 +232,8 @@ button:hover,
   font-family: Georgia, serif;
   font-style: italic;
   letter-spacing: -0.12em;
+  line-height: 1;
+  vertical-align: middle;
 }
 
 .mainContainer p,
