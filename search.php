@@ -1,5 +1,6 @@
 <?php
 $query = trim($_REQUEST["q"] ?? '');
+$hide_ai_modified = ($_GET["hide_ai_modified"] ?? "") === "1";
 
 if (strlen($query) < 1 || strlen($query) > 64) {
     header("Location: ./");
@@ -18,6 +19,7 @@ require "misc/header.php";
             <input type="text" name="q" placeholder="Search images" value="<?php echo $query_escaped; ?>" required maxlength="64">
             <button type="submit">Search</button>
         </div>
+        <label><input type="checkbox" name="hide_ai_modified" value="1"<?php echo $hide_ai_modified ? " checked" : ""; ?>> Hide Pinterest-labeled AI-modified Pins</label>
     </form>
 
     <main>
@@ -30,6 +32,7 @@ require "misc/header.php";
 // Fetching query and optional parameters
 $bookmark = $_GET["bookmark"] ?? null;
 $csrftoken = $_GET["csrftoken"] ?? null;
+require "misc/ai_filter.php";
 
 // Pinterest API endpoint
 $url = "https://www.pinterest.com/resource/BaseSearchResource/get/";
@@ -86,18 +89,32 @@ $prepare_search_curl_obj = function ($query, $bookmark) use ($url, $header_funct
 };
 
 // Function to perform the search and display results
-$search = function ($query, $bookmark) use ($prepare_search_curl_obj) {
+$search = function ($query, $bookmark, $hide_ai_modified) use ($prepare_search_curl_obj) {
     $ch = $prepare_search_curl_obj($query, $bookmark);
     $response = curl_exec($ch);
     curl_close($ch);
     $data = json_decode($response);
     
     $images = [];
+    $ai_labels = [];
+    if ($hide_ai_modified && $data && isset($data->resource_response->data->results)) {
+        $pin_ids = [];
+        foreach ($data->resource_response->data->results as $pin) {
+            if (isset($pin->images->orig->url, $pin->id)) {
+                $pin_ids[] = $pin->id;
+            }
+        }
+        $ai_labels = pinternext_get_ai_labels($pin_ids);
+    }
+
     echo "<div class='img-container' role='feed' aria-label='Masonry image feed'>";
     
     if ($data && isset($data->resource_response->data->results)) {
         foreach ($data->resource_response->data->results as $result) {
             if (!isset($result->images->orig->url)) {
+                continue;
+            }
+            if ($hide_ai_modified && isset($result->id) && ($ai_labels[(string) $result->id] ?? false)) {
                 continue;
             }
 
@@ -136,7 +153,7 @@ $search = function ($query, $bookmark) use ($prepare_search_curl_obj) {
     return $result;
 };
 
-$result = $search($query, $bookmark);
+$result = $search($query, $bookmark, $hide_ai_modified);
 $images = $result->images;
 
 // Pagination link for the next page
@@ -144,8 +161,9 @@ if ($result->bookmark !== null) {
     $query_encoded = urlencode($query);
     $bookmark_encoded = urlencode($result->bookmark);
     $csrftoken_encoded = $csrftoken ? urlencode($csrftoken) : "";
+    $hide_ai_modified_param = $hide_ai_modified ? "&hide_ai_modified=1" : "";
 
-    echo "<section class='next-page' aria-live='polite'><a class='button-link' href='/search.php?q=$query_encoded&bookmark=$bookmark_encoded&csrftoken=$csrftoken_encoded'>Load more ideas</a></section>";
+    echo "<section class='next-page' aria-live='polite'><a class='button-link' href='/search.php?q=$query_encoded&bookmark=$bookmark_encoded&csrftoken=$csrftoken_encoded$hide_ai_modified_param'>Load more ideas</a></section>";
 }
 ?>
     </main>
